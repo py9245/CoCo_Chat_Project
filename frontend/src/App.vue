@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import {
   fetchHealth,
   fetchMessages,
@@ -10,6 +10,8 @@ import {
   loadAuthToken,
   saveAuthToken,
   clearAuthToken,
+  fetchChatMessages,
+  postChatMessage,
 } from '@/services/api'
 
 const isLoading = ref(true)
@@ -38,6 +40,22 @@ const authError = ref('')
 const isRegistering = ref(false)
 const isLoggingIn = ref(false)
 const isLoggingOut = ref(false)
+const chatMessages = ref([])
+const chatForm = reactive({
+  content: '',
+  isAnonymous: true,
+})
+const isChatLoading = ref(true)
+const isChatSending = ref(false)
+const chatError = ref('')
+const CHAT_HISTORY_LIMIT = 80
+const CHAT_POLL_INTERVAL = 5000
+let chatPollTimer = null
+
+const canSendChat = computed(() => {
+  if (!currentUser.value) return false
+  return Boolean(chatForm.content.trim())
+})
 
 const timestamp = (date) =>
   new Intl.DateTimeFormat('ko-KR', {
@@ -126,6 +144,67 @@ function applySession(token, user) {
   currentUser.value = user
 }
 
+async function loadChatMessages({ silent = false } = {}) {
+  if (!silent) {
+    isChatLoading.value = true
+  }
+  try {
+    const payload = await fetchChatMessages({ limit: CHAT_HISTORY_LIMIT })
+    chatMessages.value = Array.isArray(payload?.messages) ? payload.messages : []
+    if (!silent) {
+      chatError.value = ''
+    }
+  } catch (error) {
+    console.error('채팅 로드 실패', error)
+    chatError.value = '채팅 메시지를 불러오지 못했습니다.'
+  } finally {
+    if (!silent) {
+      isChatLoading.value = false
+    }
+  }
+}
+
+function stopChatPolling() {
+  if (chatPollTimer) {
+    clearInterval(chatPollTimer)
+    chatPollTimer = null
+  }
+}
+
+function startChatPolling() {
+  if (typeof window === 'undefined') return
+  stopChatPolling()
+  chatPollTimer = window.setInterval(() => {
+    loadChatMessages({ silent: true })
+  }, CHAT_POLL_INTERVAL)
+}
+
+async function handleChatSubmit() {
+  if (!currentUser.value) {
+    chatError.value = '로그인 후 이용해 주세요.'
+    return
+  }
+  const content = chatForm.content.trim()
+  if (!content) {
+    chatError.value = '메시지를 입력해 주세요.'
+    return
+  }
+  isChatSending.value = true
+  try {
+    const payload = await postChatMessage({
+      content,
+      is_anonymous: chatForm.isAnonymous,
+    })
+    chatMessages.value = [...chatMessages.value, payload].slice(-CHAT_HISTORY_LIMIT)
+    chatForm.content = ''
+    chatError.value = ''
+  } catch (error) {
+    chatError.value = extractErrorMessage(error, '메시지를 전송하지 못했습니다.')
+  } finally {
+    isChatSending.value = false
+  }
+}
+
 async function handleRegister() {
   resetMessages()
   isRegistering.value = true
@@ -183,7 +262,12 @@ async function handleLogout() {
 }
 
 onMounted(async () => {
-  await Promise.all([bootstrapAuth(), refreshData()])
+  await Promise.all([bootstrapAuth(), refreshData(), loadChatMessages()])
+  startChatPolling()
+})
+
+onUnmounted(() => {
+  stopChatPolling()
 })
 </script>
 
@@ -204,6 +288,7 @@ onMounted(async () => {
           <span v-if="isRefreshing">새로 고치는 중...</span>
           <span v-else>목록 새로 고침</span>
         </button>
+        <a class="toolbar-link" href="/chat.html">전체 채팅방 열기</a>
         <span v-if="lastUpdated" class="timestamp">마지막 갱신: {{ formatDate(lastUpdated) }}</span>
       </div>
     </header>
@@ -299,6 +384,48 @@ onMounted(async () => {
 
         <p v-if="authMessage" class="auth-message success">{{ authMessage }}</p>
         <p v-if="authError" class="auth-message error">{{ authError }}</p>
+      </section>
+
+      <section class="panel chat-panel">
+        <header>
+          <h2>실시간 자유 채팅방</h2>
+          <p class="panel-note">로그인 후 익명 또는 아이디를 공개해 자유롭게 이야기해 보세요.</p>
+        </header>
+
+        <div v-if="isChatLoading" class="chat-empty">채팅 메시지를 불러오는 중...</div>
+        <div v-else-if="!chatMessages.length" class="chat-empty">아직 대화가 없습니다. 첫 메시지를 남겨보세요!</div>
+        <div v-else class="chat-messages">
+          <article v-for="chat in chatMessages" :key="chat.id" class="chat-message">
+            <div class="chat-meta">
+              <span class="chat-display-name" :class="{ anonymous: chat.is_anonymous }">{{ chat.display_name }}</span>
+              <time>{{ formatDate(chat.created_at) }}</time>
+            </div>
+            <p>{{ chat.content }}</p>
+          </article>
+        </div>
+
+        <p v-if="chatError" class="chat-error">{{ chatError }}</p>
+
+        <form v-if="currentUser" class="chat-form" autocomplete="off" @submit.prevent="handleChatSubmit">
+          <label class="chat-toggle">
+            <input v-model="chatForm.isAnonymous" type="checkbox" />
+            <span>{{ chatForm.isAnonymous ? '익명으로 보내기' : '아이디 공개' }}</span>
+          </label>
+          <textarea
+            v-model="chatForm.content"
+            name="chat-content"
+            placeholder="지금 떠오르는 생각을 적어보세요 (최대 500자)"
+            maxlength="500"
+          ></textarea>
+          <button class="primary-btn" :disabled="isChatSending || !canSendChat" type="submit">
+            <span v-if="isChatSending">전송 중...</span>
+            <span v-else>메시지 전송</span>
+          </button>
+        </form>
+
+        <div v-else class="chat-locked">
+          <p>로그인한 사용자만 채팅에 참여할 수 있습니다. 위에서 먼저 로그인해 주세요.</p>
+        </div>
       </section>
 
       <section v-if="isLoading" class="panel">

@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path
 
 from core.views import (
+    ChatMessageListCreateView,
     LoginView,
     LogoutView,
     MessageListView,
@@ -34,4 +35,9 @@ urlpatterns = [
     path("api/auth/login", LoginView.as_view(), name="auth-login"),
     path("api/auth/profile", ProfileView.as_view(), name="auth-profile"),
     path("api/auth/logout", LogoutView.as_view(), name="auth-logout"),
+    path(
+        "api/chat/messages",
+        ChatMessageListCreateView.as_view(),
+        name="chat-messages",
+    ),
 ]

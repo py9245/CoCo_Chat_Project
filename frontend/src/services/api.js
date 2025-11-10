@@ -104,3 +104,19 @@ export const registerUser = (body) => request('/auth/register', { method: 'POST'
 export const loginUser = (body) => request('/auth/login', { method: 'POST', body })
 export const fetchProfile = () => request('/auth/profile')
 export const logoutUser = () => request('/auth/logout', { method: 'POST' })
+
+const buildQueryString = (params = {}) => {
+  const searchParams = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') return
+    searchParams.set(key, value)
+  })
+  const query = searchParams.toString()
+  return query ? `?${query}` : ''
+}
+
+export const fetchChatMessages = (params) =>
+  request(`/chat/messages${buildQueryString(params)}`)
+
+export const postChatMessage = (body) =>
+  request('/chat/messages', { method: 'POST', body })
