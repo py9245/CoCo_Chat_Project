@@ -11,6 +11,8 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() == "true"
 TIME_ZONE = os.getenv("DJANGO_TIME_ZONE", "Asia/Seoul")
 USE_TZ = True
+USE_S3 = os.getenv("USE_S3", "0").lower() in {"1", "true", "yes"}
+AWS_PRESIGNED_URL_EXPIRES = int(os.getenv("AWS_PRESIGNED_URL_EXPIRES", "3600"))
 
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 CSRF_TRUSTED_ORIGINS = [o for o in os.getenv("DJANGO_TRUSTED_ORIGINS", "").split(",") if o]
@@ -26,8 +28,14 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",
-    "core",
+    "accounts",
+    "boards",
+    "chatrooms",
+    "pages",
 ]
+
+if USE_S3:
+    INSTALLED_APPS.append("storages")
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -119,3 +127,30 @@ REST_FRAMEWORK = {
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+if USE_S3:
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION", os.getenv("AWS_S3_REGION_NAME"))
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_S3_BUCKET")
+    AWS_S3_CUSTOM_DOMAIN = os.getenv("AWS_S3_CUSTOM_DOMAIN")
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_S3_ENDPOINT_URL = os.getenv("AWS_S3_ENDPOINT_URL")
+
+    if not AWS_STORAGE_BUCKET_NAME:
+        raise RuntimeError("USE_S3=1 이지만 AWS_S3_BUCKET 변수가 설정되지 않았습니다.")
+
+    if not AWS_S3_CUSTOM_DOMAIN and AWS_S3_REGION_NAME:
+        AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com"
+    elif not AWS_S3_CUSTOM_DOMAIN:
+        AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
+
+    if AWS_S3_ENDPOINT_URL:
+        AWS_S3_CUSTOM_DOMAIN = AWS_S3_ENDPOINT_URL.replace("https://", "").replace("http://", "")
+
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/"

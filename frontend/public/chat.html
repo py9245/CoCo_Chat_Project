@@ -248,7 +248,7 @@
 
       <section class="panel">
         <h2>대화 목록</h2>
-        <p class="panel-note">3초마다 자동으로 최신 메시지를 불러옵니다.</p>
+        <p class="panel-note">0.5초마다 자동으로 최신 메시지를 불러옵니다.</p>
         <p class="status-text" id="status-text">최근 대화 불러오는 중...</p>
         <div class="messages" id="chat-messages"></div>
         <p class="empty" id="empty-state" hidden>아직 대화가 없습니다. 첫 메시지를 남겨보세요!</p>
@@ -259,7 +259,7 @@
         <h2>메시지 보내기</h2>
         <p class="panel-note">한 번에 최대 500자까지 입력할 수 있습니다.</p>
         <div class="notice" id="login-notice" hidden>
-          로그인 정보가 필요합니다. <a href="/" style="color: #71c4ff">메인 페이지</a>에서 로그인한 후 다시 돌아오세요.
+          로그인 정보가 필요합니다. <a href="/accounts" style="color: #71c4ff">계정 페이지</a>에서 로그인한 후 다시 돌아오세요.
         </div>
         <div class="notice" id="profile-box" hidden></div>
         <form id="chat-form">
@@ -282,7 +282,7 @@
       ;(() => {
         const TOKEN_STORAGE_KEY = 'codex_auth_token'
         const CHAT_LIMIT = 80
-        const POLL_INTERVAL = 3000
+        const POLL_INTERVAL = 500
 
         const chatMessagesEl = document.getElementById('chat-messages')
         const emptyStateEl = document.getElementById('empty-state')

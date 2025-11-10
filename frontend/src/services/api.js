@@ -57,21 +57,29 @@ const buildOptions = (method, body) => {
   const headers = {
     Accept: 'application/json',
   }
-
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json'
   }
-
   const token = loadAuthToken()
   if (token) {
     headers.Authorization = `Token ${token}`
   }
-
   return {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   }
+}
+
+const buildAuthHeaders = () => {
+  const headers = {
+    Accept: 'application/json',
+  }
+  const token = loadAuthToken()
+  if (token) {
+    headers.Authorization = `Token ${token}`
+  }
+  return headers
 }
 
 async function request(path, { method = 'GET', body } = {}) {
@@ -97,13 +105,50 @@ async function request(path, { method = 'GET', body } = {}) {
   return payload
 }
 
-export const fetchHealth = () => request('/healthz')
-export const fetchMessages = () => request('/messages')
+async function requestMultipart(path, { method = 'POST', body }) {
+  const response = await fetch(buildUrl(path), {
+    method,
+    headers: buildAuthHeaders(),
+    body,
+  })
+  const rawText = await response.text()
+  let payload = null
+  if (rawText) {
+    try {
+      payload = JSON.parse(rawText)
+    } catch {
+      payload = null
+    }
+  }
 
-export const registerUser = (body) => request('/auth/register', { method: 'POST', body })
-export const loginUser = (body) => request('/auth/login', { method: 'POST', body })
-export const fetchProfile = () => request('/auth/profile')
-export const logoutUser = () => request('/auth/logout', { method: 'POST' })
+  if (!response.ok) {
+    const message = payload?.detail || `Request failed: ${response.status}`
+    const error = new Error(message)
+    error.status = response.status
+    error.payload = payload
+    throw error
+  }
+
+  return payload
+}
+
+export const fetchHealth = () => request('/healthz')
+export const fetchHomeOverview = () => request('/pages/home')
+
+export const registerUser = (body) => request('/accounts/register', { method: 'POST', body })
+export const loginUser = (body) => request('/accounts/login', { method: 'POST', body })
+export const fetchProfile = () => request('/accounts/profile')
+export const logoutUser = () => request('/accounts/logout', { method: 'POST' })
+export const updateProfile = (body) => request('/accounts/profile/update', { method: 'PATCH', body })
+export const changePassword = (body) => request('/accounts/profile/password', { method: 'POST', body })
+export const uploadAvatar = (formData) => requestMultipart('/accounts/profile/avatar', { method: 'POST', body: formData })
+export const deleteAccount = (body) => request('/accounts/profile/delete', { method: 'POST', body })
+
+export const fetchPosts = () => request('/boards/posts')
+export const createPost = (formData) => requestMultipart('/boards/posts', { method: 'POST', body: formData })
+export const updatePost = (id, formData) =>
+  requestMultipart(`/boards/posts/${id}`, { method: 'PATCH', body: formData })
+export const deletePost = (id) => request(`/boards/posts/${id}`, { method: 'DELETE' })
 
 const buildQueryString = (params = {}) => {
   const searchParams = new URLSearchParams()
@@ -115,8 +160,5 @@ const buildQueryString = (params = {}) => {
   return query ? `?${query}` : ''
 }
 
-export const fetchChatMessages = (params) =>
-  request(`/chat/messages${buildQueryString(params)}`)
-
-export const postChatMessage = (body) =>
-  request('/chat/messages', { method: 'POST', body })
+export const fetchChatMessages = (params) => request(`/chat/messages${buildQueryString(params)}`)
+export const postChatMessage = (body) => request('/chat/messages', { method: 'POST', body })
