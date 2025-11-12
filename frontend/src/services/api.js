@@ -160,5 +160,11 @@ const buildQueryString = (params = {}) => {
   return query ? `?${query}` : ''
 }
 
-export const fetchChatMessages = (params) => request(`/chat/messages${buildQueryString(params)}`)
-export const postChatMessage = (body) => request('/chat/messages', { method: 'POST', body })
+export const fetchChatRooms = () => request('/chat/rooms')
+export const createChatRoom = (body) => request('/chat/rooms', { method: 'POST', body })
+export const joinChatRoom = (body) => request('/chat/rooms/join', { method: 'POST', body })
+export const leaveChatRoom = (roomId) => request(`/chat/rooms/${roomId}/leave`, { method: 'POST' })
+export const fetchChatMessages = (roomId, params) =>
+  request(`/chat/rooms/${roomId}/messages${buildQueryString(params)}`)
+export const postChatMessage = (roomId, body) =>
+  request(`/chat/rooms/${roomId}/messages`, { method: 'POST', body })
