@@ -1,0 +1,24 @@
+services:
+  backend:
+    # 호스트에서 직접 호출할 수 있도록 8000 포트를 열어둔다.
+    ports:
+      - "8000:8000"
+    # 원격 Postgres를 사용하므로 db 서비스 의존성을 제거한다.
+    depends_on: []
+    environment:
+      # 기본값이 없을 경우 로컬 개발 기본값을 제공한다.
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-True}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,15.164.232.40}
+      DJANGO_TRUSTED_ORIGINS: ${DJANGO_TRUSTED_ORIGINS:-http://localhost,http://127.0.0.1,http://localhost:5173,https://15.164.232.40}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,https://py9245.github.io}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://appuser:1234@15.164.232.40:5433/appdb}
+
+  # 로컬 개발 시 nginx 없이도 프런트(dev server)와 직접 통신할 수 있도록 프로파일로 분리한다.
+  nginx:
+    profiles:
+      - local-nginx
+
+  # EC2 Postgres를 공유할 것이므로 로컬에서는 기본적으로 기동하지 않는다.
+  db:
+    profiles:
+      - remote-db

@@ -6,7 +6,7 @@ const AccountsView = () => import('@/views/AccountsView.vue')
 const ChatView = () => import('@/views/ChatView.vue')
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   scrollBehavior() {
     return { top: 0 }
   },

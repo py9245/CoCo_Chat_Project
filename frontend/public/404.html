@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>Codex · 페이지 이동 중...</title>
+    <meta name="robots" content="noindex" />
+    <script>
+      ;(function () {
+        var pathSegmentsToKeep = 1
+        var l = window.location
+        var pathnameParts = l.pathname.split('/')
+        var baseSegments = pathnameParts.slice(0, 1 + pathSegmentsToKeep).join('/')
+        var remainingSegments = pathnameParts.slice(1 + pathSegmentsToKeep).join('/')
+        var search = l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : ''
+        var newUrl =
+          l.protocol + '//' + l.host + baseSegments + '/?/' + remainingSegments + search + l.hash
+
+        l.replace(newUrl)
+      })()
+    </script>
+  </head>
+  <body>
+    <p>요청하신 경로를 다시 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+  </body>
+</html>
