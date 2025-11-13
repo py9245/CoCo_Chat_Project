@@ -29,7 +29,7 @@ const handleGlobalLogout = async () => {
 <template>
   <div class="app-shell">
     <header class="naver-nav shadow-sm">
-      <nav class="navbar navbar-expand-lg navbar-light bg-white">
+      <nav class="navbar navbar-light bg-white">
         <div class="container">
           <RouterLink class="navbar-brand naver-logo" to="/">Codex Platform</RouterLink>
           <button

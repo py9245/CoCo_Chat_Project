@@ -18,7 +18,12 @@ const loadData = async () => {
       ok: Boolean(healthPayload?.ok),
       text: healthPayload?.ok ? 'API 정상 동작 중' : 'API 응답 이상',
     }
-    sections.value = Array.isArray(homePayload?.sections) ? homePayload.sections : []
+    sections.value = Array.isArray(homePayload?.sections)
+      ? homePayload.sections.map((section) => ({
+          ...section,
+          slug: section.slug === 'HERO' ? 'RANDOM_CHAT' : section.slug,
+        }))
+      : []
     stats.value = Array.isArray(homePayload?.stats) ? homePayload.stats : []
     totals.value = homePayload?.totals ?? { users: 0, posts: 0, messages: 0 }
   } catch (error) {

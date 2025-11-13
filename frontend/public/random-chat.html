@@ -21,6 +21,31 @@
         background: #f5f6f8;
       }
 
+      .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        background: #fff;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .logo {
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #03c75a;
+        text-decoration: none;
+      }
+
+      .home-link {
+        color: #0f172a;
+        text-decoration: none;
+        font-size: 0.95rem;
+        border: 1px solid #d1d5db;
+        padding: 6px 12px;
+        border-radius: 999px;
+      }
+
       .container {
         max-width: 960px;
         margin: 0 auto;
@@ -190,6 +215,10 @@
     </style>
   </head>
   <body>
+    <div class="top-bar">
+      <a class="logo" href="/">Codex Platform</a>
+      <a class="home-link" href="/">홈으로 돌아가기</a>
+    </div>
     <div class="container">
       <header>
         <h1>랜덤 채팅 전용 화면</h1>
