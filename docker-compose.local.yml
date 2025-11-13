@@ -1,21 +1,32 @@
 services:
   backend:
+    build: ./backend
+    container_name: backend
     env_file:
       - ./.env.local
-    # 호스트에서 직접 호출할 수 있도록 8000 포트를 열어둔다.
     ports:
       - "8000:8000"
-    # 원격 Postgres를 사용하므로 db 서비스 의존성을 제거한다.
-    depends_on: []
+    volumes:
+      - ./backend/staticfiles:/app/staticfiles
+      - ./backend/media:/app/media
     extra_hosts:
       - "host.docker.internal:host-gateway"  # SSH 포트포워딩 DB 접속용
+    restart: unless-stopped
 
-  # 로컬 개발 시 nginx 없이도 프런트(dev server)와 직접 통신할 수 있도록 프로파일로 분리한다.
   nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx
     profiles:
       - local-nginx
-
-  # EC2 Postgres를 공유할 것이므로 로컬에서는 기본적으로 기동하지 않는다.
-  db:
-    profiles:
-      - remote-db
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./frontend_build:/usr/share/nginx/html:ro
+      - ./certs:/etc/letsencrypt:ro
+      - ./backend/staticfiles:/staticfiles:ro
+      - ./backend/media:/media:ro
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -5,6 +5,20 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import './style.css'
 
+const BASE_STORAGE_KEY = 'codex-spa-base-path'
+
+const persistBasePath = () => {
+  if (typeof window === 'undefined') return
+  try {
+    const rawBase = import.meta.env.BASE_URL || '/'
+    const baseWithLeading = rawBase.startsWith('/') ? rawBase : `/${rawBase}`
+    const normalized = baseWithLeading.endsWith('/') ? baseWithLeading : `${baseWithLeading}/`
+    window.localStorage.setItem(BASE_STORAGE_KEY, normalized)
+  } catch (error) {
+    console.warn('기본 경로를 저장하지 못했습니다.', error)
+  }
+}
+
 const restoreGitHubPagesPath = () => {
   const { search, pathname, hash } = window.location
   if (!search.startsWith('?/')) {
@@ -24,6 +38,7 @@ const restoreGitHubPagesPath = () => {
   window.history.replaceState(null, document.title, newUrl)
 }
 
+persistBasePath()
 restoreGitHubPagesPath()
 
 const app = createApp(App)

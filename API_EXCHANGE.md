@@ -27,8 +27,14 @@ Vue Router 기반 SPA(`frontend/src/router/index.js`)는 `frontend/src/services/
 |  | POST | `/boards/posts` | 필요 | `multipart/form-data(title, body, attachment?)` | `{ id, title, body, attachment_url, created_at, author }` |
 |  | PATCH | `/boards/posts/<id>` | 필요 | `multipart/form-data(title?, body?, attachment?, clear_attachment?)` | `{ post: {...} }` |
 |  | DELETE | `/boards/posts/<id>` | 필요 | - | `204 No Content` |
-| **Chatrooms** | GET | `/chat/messages?limit=1..150` | 선택 | - | `{ messages: [ { id, content, created_at, is_anonymous, display_name } ] }` |
+| **Chatrooms - Rooms** | GET | `/chat/messages?limit=1..150` | 선택 | - | `{ messages: [ { id, content, created_at, is_anonymous, display_name } ] }` |
 |  | POST | `/chat/messages` | 필요 | `{ content, is_anonymous }` | `{ ...same as 위 }` |
+| **Chatrooms - Random** | GET | `/chat/random/state?limit=1..80` | 필요 | - | `{ in_queue, queue_position, queue_size, session, messages }` |
+|  | POST | `/chat/random/queue` | 필요 | - | `state payload` |
+|  | DELETE | `/chat/random/queue` | 필요 | - | `{ detail }` |
+|  | POST | `/chat/random/match` | 필요 | - | `state payload (새 세션 포함)` |
+|  | GET | `/chat/random/messages?limit=1..80` | 필요 | - | `{ messages: [ { id, content, created_at, from_self } ] }` |
+|  | POST | `/chat/random/messages` | 필요 | `{ content }` | `{ id, content, created_at, from_self }` |
 
 ## 3. 페이지별 흐름
 ### 3.1 HomeView (`/`)
@@ -46,7 +52,13 @@ Vue Router 기반 SPA(`frontend/src/router/index.js`)는 `frontend/src/services/
 2. 메시지 전송 시 `postChatMessage()` 호출, 응답을 현지 배열 끝에 붙이고 슬라이싱으로 80개 유지.
 3. 독립 HTML(`frontend/public/chat.html`)도 동일 API를 사용하며 별도 토큰 없이 읽기 가능, 0.5초 폴링.
 
-### 3.4 AccountsView (`/accounts`)
+### 3.4 Home Random Chat
+1. 홈 중앙 패널에서 `fetchRandomChatState(limit=60)`으로 대기열, 세션, 메시지를 한 번에 불러온다.
+2. **랜덤채팅 탭** 버튼은 `joinRandomChatQueue()`를 호출해 대기열에 합류하고, **채팅하기** 버튼은 `requestRandomChatMatch()`로 본인을 제외한 다른 이용자와 1:1 세션을 생성한다.
+3. 매칭 후 메시지는 `fetchRandomChatMessages()`를 2초 간격으로 폴링하고, 전송은 `postRandomChatMessage({ content })`로 처리한다.
+4. 모든 랜덤 채팅은 익명이며, 서버/클라이언트 모두 `010-0000-0000` 형식이 포함된 메시지를 거부한다.
+
+### 3.5 AccountsView (`/accounts`)
 1. 비로그인 상태: 회원가입/로그인 폼이 `registerUser()`, `loginUser()` 호출.
 2. 로그인 후: 프로필 카드 + 수정 폼 + 아바타 업로드 + 비밀번호 변경 폼이 각각 `updateProfile()`, `uploadAvatar()`, `changePassword()`를 호출.
 3. 비밀번호 변경 시 DRF 토큰이 재발급되므로, 응답 `token`을 받아 `setSession(token, profile)`로 교체.

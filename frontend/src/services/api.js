@@ -168,3 +168,10 @@ export const fetchChatMessages = (roomId, params) =>
   request(`/chat/rooms/${roomId}/messages${buildQueryString(params)}`)
 export const postChatMessage = (roomId, body) =>
   request(`/chat/rooms/${roomId}/messages`, { method: 'POST', body })
+
+export const fetchRandomChatState = (params) => request(`/chat/random/state${buildQueryString(params)}`)
+export const joinRandomChatQueue = () => request('/chat/random/queue', { method: 'POST' })
+export const leaveRandomChatQueue = () => request('/chat/random/queue', { method: 'DELETE' })
+export const requestRandomChatMatch = () => request('/chat/random/match', { method: 'POST' })
+export const fetchRandomChatMessages = (params) => request(`/chat/random/messages${buildQueryString(params)}`)
+export const postRandomChatMessage = (body) => request('/chat/random/messages', { method: 'POST', body })

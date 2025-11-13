@@ -245,6 +245,14 @@ const handleSubmit = async () => {
   }
 }
 
+const handleEditorKeydown = (event) => {
+  if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
+    return
+  }
+  event.preventDefault()
+  handleSubmit()
+}
+
 onMounted(async () => {
   await ensureProfileLoaded()
   await loadRooms()
@@ -431,6 +439,7 @@ onUnmounted(() => {
                 name="chat-content"
                 placeholder="지금 떠오르는 생각을 적어보세요 (최대 500자)"
                 maxlength="500"
+                @keydown="handleEditorKeydown"
               ></textarea>
               <button class="btn btn-primary nav-hover mt-3" :disabled="isSending || !canSend" type="submit">
                 <span v-if="isSending">전송 중...</span>

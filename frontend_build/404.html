@@ -6,14 +6,34 @@
     <meta name="robots" content="noindex" />
     <script>
       ;(function () {
-        var pathSegmentsToKeep = 1
+        var BASE_KEY = 'codex-spa-base-path'
         var l = window.location
-        var pathnameParts = l.pathname.split('/')
-        var baseSegments = pathnameParts.slice(0, 1 + pathSegmentsToKeep).join('/')
-        var remainingSegments = pathnameParts.slice(1 + pathSegmentsToKeep).join('/')
+
+        var readStoredBasePath = function () {
+          try {
+            return window.localStorage.getItem(BASE_KEY) || '/'
+          } catch (error) {
+            return '/'
+          }
+        }
+
+        var normalizePath = function (value) {
+          if (!value) return '/'
+          var withLeadingSlash = value.startsWith('/') ? value : '/' + value
+          return withLeadingSlash.replace(/\/+$/, '/') || '/'
+        }
+
+        var storedBasePath = normalizePath(readStoredBasePath())
+        var basePath =
+          storedBasePath === '/' ? '' : storedBasePath.replace(/\/$/, '') // '' or '/foo'
+
+        var pathname = l.pathname
+        if (basePath && pathname.startsWith(basePath)) {
+          pathname = pathname.slice(basePath.length) || '/'
+        }
+
         var search = l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : ''
-        var newUrl =
-          l.protocol + '//' + l.host + baseSegments + '/?/' + remainingSegments + search + l.hash
+        var newUrl = l.protocol + '//' + l.host + basePath + '/?/' + pathname.replace(/^\//, '') + search + l.hash
 
         l.replace(newUrl)
       })()
