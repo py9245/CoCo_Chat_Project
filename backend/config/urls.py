@@ -26,4 +26,5 @@ urlpatterns = [
     path("api/accounts/", include("accounts.urls")),
     path("api/boards/", include("boards.urls")),
     path("api/chat/", include("chatrooms.urls")),
+    path("api/random-chat/", include("randomchat.urls")),
 ]

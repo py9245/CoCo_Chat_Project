@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>랜덤 채팅 전용 화면</title>
+    <style>
+      :root {
+        font-family: 'Pretendard', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #f5f6f8;
+        color: #0f172a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #f5f6f8;
+      }
+
+      .container {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 32px 20px 48px;
+      }
+
+      header {
+        margin-bottom: 24px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(1.8rem, 3vw, 2.4rem);
+      }
+
+      p {
+        margin: 0;
+        color: #4b5563;
+      }
+
+      .panel {
+        background: #fff;
+        border-radius: 18px;
+        border: 1px solid #e5e7eb;
+        padding: 24px;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        margin-bottom: 20px;
+      }
+
+      .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .status-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 16px;
+        background: #f9fafb;
+      }
+
+      .status-card span {
+        display: block;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        color: #6b7280;
+        margin-bottom: 4px;
+      }
+
+      .status-card strong {
+        font-size: 1.3rem;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      button {
+        border-radius: 999px;
+        border: 1px solid transparent;
+        padding: 10px 20px;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+      }
+
+      .btn-primary {
+        background: #03c75a;
+        color: #fff;
+        border-color: #03c75a;
+      }
+
+      .btn-secondary {
+        background: #fff;
+        border-color: #d1d5db;
+        color: #0f172a;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .alert {
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+      }
+
+      .alert-success {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #047857;
+      }
+
+      .alert-warning {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+      }
+
+      .alert-danger {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+      }
+
+      .stream {
+        max-height: 360px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 12px;
+      }
+
+      .message {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 12px 14px;
+        background: #fff;
+      }
+
+      .message.me {
+        border-color: rgba(3, 199, 90, 0.35);
+        background: rgba(3, 199, 90, 0.1);
+        align-self: flex-end;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 110px;
+        border-radius: 12px;
+        border: 1px solid #d1d5db;
+        padding: 12px 14px;
+        font-size: 1rem;
+        resize: vertical;
+        background: #fff;
+        color: #0f172a;
+      }
+
+      textarea:focus {
+        outline: none;
+        border-color: #03c75a;
+        box-shadow: 0 0 0 2px rgba(3, 199, 90, 0.15);
+      }
+
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
+
+      .placeholder {
+        border: 1px dashed #d1d5db;
+        border-radius: 14px;
+        text-align: center;
+        padding: 32px;
+        color: #6b7280;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>랜덤 채팅 전용 화면</h1>
+        <p>대기열 합류, 매칭, 메시지 전송까지 이 화면에서 모두 제어할 수 있습니다.</p>
+      </header>
+
+      <section class="panel" id="state-panel">
+        <h2>실시간 현황</h2>
+        <div id="state-alert"></div>
+        <div class="status-grid">
+          <div class="status-card">
+            <span>대기열 인원</span>
+            <strong id="queue-size">0명</strong>
+          </div>
+          <div class="status-card">
+            <span>진행 중인 채팅</span>
+            <strong id="active-sessions">0개</strong>
+          </div>
+          <div class="status-card">
+            <span>내 순서</span>
+            <strong id="queue-position">-</strong>
+          </div>
+          <div class="status-card">
+            <span>현재 상태</span>
+            <strong id="current-status">대기열에 합류하지 않았습니다.</strong>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="btn-primary" id="join-btn">대기열 진입</button>
+          <button class="btn-secondary" id="leave-btn" disabled>대기열 나가기</button>
+          <button class="btn-secondary" id="match-btn" disabled>채팅하기</button>
+          <button class="btn-secondary" id="refresh-btn">상태 새로고침</button>
+        </div>
+      </section>
+
+      <section class="panel" id="chat-panel">
+        <h2>대화 영역</h2>
+        <div id="chat-alert"></div>
+        <div id="match-notice" class="alert alert-success" hidden>상대방과 연결되었습니다.</div>
+        <div class="stream" id="message-stream"></div>
+        <div class="placeholder" id="placeholder-text">
+          아직 매칭되지 않았습니다. 대기열에 진입한 뒤 채팅하기를 눌러 상대방과 연결하세요.
+        </div>
+        <form id="message-form">
+          <textarea
+            id="message-input"
+            placeholder="메시지를 입력하세요. 010-0000-0000 형식의 연락처는 전송할 수 없습니다."
+            maxlength="500"
+            disabled
+          ></textarea>
+          <div class="form-actions">
+            <button class="btn-primary" type="submit" id="send-btn" disabled>메시지 전송</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <script>
+      ;(() => {
+        const TOKEN_KEY = 'codex_auth_token'
+        const PHONE_PATTERN = /010-\d{4}-\d{4}/
+        const STATE_LIMIT = 60
+        const determineApiBase = () => {
+          if (window.API_BASE_URL) return window.API_BASE_URL
+          const host = (window.location.hostname || '').toLowerCase()
+          if (host.includes('github.io') || host.includes('githubusercontent.com')) {
+            return 'https://15-164-232-40.nip.io/api'
+          }
+          if (window.location.origin) {
+            return `${window.location.origin}/api`
+          }
+          return 'https://15-164-232-40.nip.io/api'
+        }
+        const API_BASE_URL = determineApiBase().replace(/\/$/, '')
+
+        const queueSizeEl = document.getElementById('queue-size')
+        const activeSessionsEl = document.getElementById('active-sessions')
+        const queuePositionEl = document.getElementById('queue-position')
+        const currentStatusEl = document.getElementById('current-status')
+        const stateAlertEl = document.getElementById('state-alert')
+        const chatAlertEl = document.getElementById('chat-alert')
+        const matchNoticeEl = document.getElementById('match-notice')
+        const messageStreamEl = document.getElementById('message-stream')
+        const placeholderEl = document.getElementById('placeholder-text')
+        const messageInputEl = document.getElementById('message-input')
+        const sendBtnEl = document.getElementById('send-btn')
+        const messageFormEl = document.getElementById('message-form')
+
+        const joinBtn = document.getElementById('join-btn')
+        const leaveBtn = document.getElementById('leave-btn')
+        const matchBtn = document.getElementById('match-btn')
+        const refreshBtn = document.getElementById('refresh-btn')
+
+        let token = null
+        let statePollTimer = null
+        let messagePollTimer = null
+        let currentSessionId = null
+
+        const readToken = () => {
+          try {
+            token = localStorage.getItem(TOKEN_KEY)
+          } catch {
+            token = null
+          }
+        }
+
+        const authHeaders = () => {
+          const headers = { Accept: 'application/json' }
+          if (token) {
+            headers.Authorization = `Token ${token}`
+          }
+          return headers
+        }
+
+        const setAlert = (target, message, variant = 'danger') => {
+          if (!target) return
+          if (!message) {
+            target.innerHTML = ''
+            return
+          }
+          const className =
+            variant === 'success'
+              ? 'alert alert-success'
+              : variant === 'warning'
+                ? 'alert alert-warning'
+                : 'alert alert-danger'
+          target.innerHTML = `<div class="${className}">${message}</div>`
+        }
+
+        const renderMessages = (messages = [], partnerAlias = '상대방') => {
+          messageStreamEl.innerHTML = ''
+          if (!messages.length) {
+            placeholderEl.hidden = false
+            return
+          }
+          placeholderEl.hidden = true
+          messages.forEach((msg) => {
+            const wrapper = document.createElement('article')
+            wrapper.className = 'message' + (msg.from_self ? ' me' : '')
+            const author = msg.from_self ? '나' : partnerAlias
+            const time = new Intl.DateTimeFormat('ko-KR', {
+              timeStyle: 'short',
+            }).format(new Date(msg.created_at))
+            wrapper.innerHTML = `<strong>${author}</strong><p>${msg.content}</p><small>${time}</small>`
+            messageStreamEl.appendChild(wrapper)
+          })
+          messageStreamEl.scrollTop = messageStreamEl.scrollHeight
+        }
+
+        const updateUI = (payload) => {
+          const previousSessionId = currentSessionId
+          const {
+            queue_size = 0,
+            active_sessions = 0,
+            queue_position = null,
+            in_queue = false,
+            session = null,
+          } = payload || {}
+
+          queueSizeEl.textContent = `${queue_size}명`
+          activeSessionsEl.textContent = `${active_sessions}개`
+          queuePositionEl.textContent = queue_position ? `${queue_position}번째` : '-'
+
+          if (session) {
+            currentStatusEl.textContent = `${session.partner_alias} 연결됨`
+            messageInputEl.disabled = false
+            sendBtnEl.disabled = false
+            const isNewSession = session.id !== previousSessionId
+            currentSessionId = session.id
+            matchNoticeEl.hidden = !isNewSession
+          } else if (in_queue) {
+            currentStatusEl.textContent = '대기열에서 상대를 기다리는 중'
+            messageInputEl.disabled = true
+            sendBtnEl.disabled = true
+            matchNoticeEl.hidden = true
+            currentSessionId = null
+          } else {
+            currentStatusEl.textContent = '대기열에 합류하지 않았습니다.'
+            messageInputEl.disabled = true
+            sendBtnEl.disabled = true
+            matchNoticeEl.hidden = true
+            currentSessionId = null
+          }
+
+          leaveBtn.disabled = !in_queue
+          matchBtn.disabled = !in_queue
+
+          if (session && Array.isArray(payload.messages)) {
+            renderMessages(payload.messages, session.partner_alias)
+          } else {
+            renderMessages([])
+          }
+          startMessagePolling()
+        }
+
+        const buildApiUrl = (path) => {
+          const normalized = path.startsWith('/') ? path : `/${path}`
+          return `${API_BASE_URL}${normalized}`
+        }
+
+        const request = async (path, options = {}) => {
+          const response = await fetch(buildApiUrl(path), {
+            ...options,
+            headers: {
+              ...authHeaders(),
+              ...(options.headers || {}),
+            },
+          })
+          const text = await response.text()
+          let payload = null
+          if (text) {
+            try {
+              payload = JSON.parse(text)
+            } catch {
+              payload = null
+            }
+          }
+          if (!response.ok) {
+            const message =
+              payload?.detail ||
+              (response.status === 404
+                ? '랜덤 채팅 서버가 아직 업데이트되지 않았습니다. 잠시 후 다시 시도해 주세요.'
+                : `요청이 실패했습니다. (${response.status})`)
+            const error = new Error(message)
+            error.payload = payload
+            error.status = response.status
+            throw error
+          }
+          return payload
+        }
+
+        const refreshState = async () => {
+          if (!token) {
+            setAlert(stateAlertEl, '로그인을 먼저 완료한 후 이용할 수 있습니다.', 'warning')
+            return
+          }
+          try {
+            const payload = await request(`/random-chat/state?limit=${STATE_LIMIT}`)
+            setAlert(stateAlertEl, '')
+            updateUI(payload)
+            startMessagePolling()
+          } catch (error) {
+            setAlert(stateAlertEl, error.message, error.status === 404 ? 'warning' : 'danger')
+          }
+        }
+
+        const refreshMessages = async () => {
+          if (!token || !currentSessionId) return
+          try {
+            const payload = await request(`/random-chat/messages?limit=${STATE_LIMIT}`)
+            renderMessages(payload?.messages, '상대방')
+          } catch (error) {
+            console.error(error)
+          }
+        }
+
+        const startPolling = () => {
+          if (statePollTimer) clearInterval(statePollTimer)
+          statePollTimer = setInterval(refreshState, 5000)
+        }
+
+        const startMessagePolling = () => {
+          if (messagePollTimer) clearInterval(messagePollTimer)
+          if (!currentSessionId) return
+          messagePollTimer = setInterval(refreshMessages, 2000)
+        }
+
+        joinBtn.addEventListener('click', async () => {
+          if (!token) {
+            setAlert(stateAlertEl, '로그인이 필요합니다.', 'warning')
+            return
+          }
+          joinBtn.disabled = true
+          try {
+            const payload = await request('/random-chat/queue', { method: 'POST' })
+            updateUI(payload)
+          } catch (error) {
+            setAlert(stateAlertEl, error.message)
+          } finally {
+            joinBtn.disabled = false
+            startPolling()
+          }
+        })
+
+        leaveBtn.addEventListener('click', async () => {
+          leaveBtn.disabled = true
+          try {
+            await request('/random-chat/queue', { method: 'DELETE' })
+            await refreshState()
+          } catch (error) {
+            setAlert(stateAlertEl, error.message)
+          } finally {
+            leaveBtn.disabled = false
+          }
+        })
+
+        matchBtn.addEventListener('click', async () => {
+          matchBtn.disabled = true
+          try {
+            const payload = await request('/random-chat/match', { method: 'POST' })
+            updateUI(payload)
+            startMessagePolling()
+          } catch (error) {
+            setAlert(stateAlertEl, error.message, error.status === 202 ? 'warning' : 'danger')
+          } finally {
+            matchBtn.disabled = false
+          }
+        })
+
+        refreshBtn.addEventListener('click', () => {
+          refreshState()
+        })
+
+        messageInputEl.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+            event.preventDefault()
+            sendBtnEl.click()
+          }
+        })
+
+        messageFormEl.addEventListener('submit', async (event) => {
+          event.preventDefault()
+          if (!currentSessionId) {
+            setAlert(chatAlertEl, '매칭이 완료된 후 메시지를 보낼 수 있습니다.', 'warning')
+            return
+          }
+          const content = messageInputEl.value.trim()
+          if (!content) {
+            setAlert(chatAlertEl, '메시지를 입력해 주세요.', 'warning')
+            return
+          }
+          if (PHONE_PATTERN.test(content)) {
+            setAlert(chatAlertEl, '전화번호 형식(010-0000-0000)은 전송할 수 없습니다.')
+            return
+          }
+          sendBtnEl.disabled = true
+          try {
+            await request('/random-chat/messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content }),
+            })
+            messageInputEl.value = ''
+            setAlert(chatAlertEl, '', 'success')
+            await refreshMessages()
+          } catch (error) {
+            setAlert(chatAlertEl, error.message)
+          } finally {
+            sendBtnEl.disabled = false
+          }
+        })
+
+        window.addEventListener('storage', (event) => {
+          if (event.key === TOKEN_KEY) {
+            readToken()
+            refreshState()
+          }
+        })
+
+        readToken()
+        refreshState().then(() => {
+          startPolling()
+          startMessagePolling()
+        })
+      })()
+    </script>
+  </body>
+</html>

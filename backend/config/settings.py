@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "accounts",
     "boards",
     "chatrooms",
+    "randomchat",
     "pages",
 ]
 

@@ -29,12 +29,12 @@ Vue Router 기반 SPA(`frontend/src/router/index.js`)는 `frontend/src/services/
 |  | DELETE | `/boards/posts/<id>` | 필요 | - | `204 No Content` |
 | **Chatrooms - Rooms** | GET | `/chat/messages?limit=1..150` | 선택 | - | `{ messages: [ { id, content, created_at, is_anonymous, display_name } ] }` |
 |  | POST | `/chat/messages` | 필요 | `{ content, is_anonymous }` | `{ ...same as 위 }` |
-| **Chatrooms - Random** | GET | `/chat/random/state?limit=1..80` | 필요 | - | `{ in_queue, queue_position, queue_size, session, messages }` |
-|  | POST | `/chat/random/queue` | 필요 | - | `state payload` |
-|  | DELETE | `/chat/random/queue` | 필요 | - | `{ detail }` |
-|  | POST | `/chat/random/match` | 필요 | - | `state payload (새 세션 포함)` |
-|  | GET | `/chat/random/messages?limit=1..80` | 필요 | - | `{ messages: [ { id, content, created_at, from_self } ] }` |
-|  | POST | `/chat/random/messages` | 필요 | `{ content }` | `{ id, content, created_at, from_self }` |
+| **RandomChat 앱** | GET | `/random-chat/state?limit=1..80` | 필요 | - | `{ in_queue, queue_position, queue_size, active_sessions, session, messages }` |
+|  | POST | `/random-chat/queue` | 필요 | - | `state payload` |
+|  | DELETE | `/random-chat/queue` | 필요 | - | `{ detail }` |
+|  | POST | `/random-chat/match` | 필요 | - | `state payload (새 세션 포함)` |
+|  | GET | `/random-chat/messages?limit=1..80` | 필요 | - | `{ messages: [ { id, content, created_at, from_self } ] }` |
+|  | POST | `/random-chat/messages` | 필요 | `{ content }` | `{ id, content, created_at, from_self }` |
 
 ## 3. 페이지별 흐름
 ### 3.1 HomeView (`/`)
@@ -52,11 +52,12 @@ Vue Router 기반 SPA(`frontend/src/router/index.js`)는 `frontend/src/services/
 2. 메시지 전송 시 `postChatMessage()` 호출, 응답을 현지 배열 끝에 붙이고 슬라이싱으로 80개 유지.
 3. 독립 HTML(`frontend/public/chat.html`)도 동일 API를 사용하며 별도 토큰 없이 읽기 가능, 0.5초 폴링.
 
-### 3.4 Home Random Chat
-1. 홈 중앙 패널에서 `fetchRandomChatState(limit=60)`으로 대기열, 세션, 메시지를 한 번에 불러온다.
-2. **랜덤채팅 탭** 버튼은 `joinRandomChatQueue()`를 호출해 대기열에 합류하고, **채팅하기** 버튼은 `requestRandomChatMatch()`로 본인을 제외한 다른 이용자와 1:1 세션을 생성한다.
-3. 매칭 후 메시지는 `fetchRandomChatMessages()`를 2초 간격으로 폴링하고, 전송은 `postRandomChatMessage({ content })`로 처리한다.
-4. 모든 랜덤 채팅은 익명이며, 서버/클라이언트 모두 `010-0000-0000` 형식이 포함된 메시지를 거부한다.
+### 3.4 RandomChat 앱 & 전용 페이지
+1. Django `randomchat` 앱이 `/api/random-chat/*` 엔드포인트를 제공하며, 정적 페이지 `/random-chat.html`이 동일 API를 직접 호출한다.
+2. 페이지 상단의 **대기열 진입** 버튼은 `joinRandomChatQueue()`와 동일한 REST 호출을 수행해 대기열에 합류하고, **채팅하기**는 `requestRandomChatMatch()`를 호출해 1:1 세션을 생성한다.
+3. 전용 페이지는 `state.queue_size`와 `state.active_sessions`를 즉시 노출해 대기열·진행 중 채팅 수를 확인할 수 있다.
+4. 매칭 후 메시지는 `fetchRandomChatMessages()`를 2초 간격으로 폴링하고, 전송은 `postRandomChatMessage({ content })`로 처리한다.
+5. 모든 랜덤 채팅은 익명이며, 서버/클라이언트 모두 `010-0000-0000` 형식이 포함된 메시지를 거부한다.
 
 ### 3.5 AccountsView (`/accounts`)
 1. 비로그인 상태: 회원가입/로그인 폼이 `registerUser()`, `loginUser()` 호출.
@@ -81,3 +82,4 @@ Vue Router 기반 SPA(`frontend/src/router/index.js`)는 `frontend/src/services/
 2. `docker compose exec backend python manage.py migrate`로 신규 앱(`accounts`, `boards`, `chatrooms`, `pages`) 마이그레이션을 반드시 반영.
 3. 프런트 빌드 후 `frontend_build/`를 nginx 정적 루트로 복사해야 라우팅이 동작한다(nginx는 history fallback 설정).
 4. 독립 채팅 페이지를 포함해 모든 클라이언트는 동일 토큰 키(`codex_auth_token`)를 공유하므로, 로컬스토리지 정리가 필요할 때는 `clearAuthToken()`을 호출한다.
+5. 랜덤 채팅 기능은 `randomchat` 앱으로 완전히 분리되었으므로, 배포 시 `python manage.py migrate randomchat`을 포함해 주세요.
