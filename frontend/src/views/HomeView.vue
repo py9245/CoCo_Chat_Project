@@ -5,7 +5,7 @@ import { fetchHealth, fetchHomeOverview } from '@/services/api'
 const health = ref({ ok: null, text: 'API 상태 확인 중...' })
 const sections = ref([])
 const stats = ref([])
-const totals = ref({ users: 0, posts: 0, messages: 0 })
+const totals = ref({ users: 0, posts: 0, rooms: 0 })
 const isLoading = ref(true)
 const errorMessage = ref('')
 
@@ -18,14 +18,23 @@ const loadData = async () => {
       ok: Boolean(healthPayload?.ok),
       text: healthPayload?.ok ? 'API 정상 동작 중' : 'API 응답 이상',
     }
-    sections.value = Array.isArray(homePayload?.sections)
-      ? homePayload.sections.map((section) => ({
-          ...section,
-          slug: section.slug === 'HERO' ? 'RANDOM_CHAT' : section.slug,
-        }))
-      : []
+    const fetchedSections = Array.isArray(homePayload?.sections) ? homePayload.sections : []
+    const heroSection = {
+      id: '__random_chat_card',
+      slug: 'RANDOM_CHAT',
+      title: '랜덤 채팅',
+      description: '대기열에서 무작위 이용자와 바로 매칭되어 1:1 대화를 즐길 수 있습니다.',
+      cta_label: '랜덤 채팅으로 이동',
+      cta_link: '/random-chat.html',
+    }
+    sections.value = [
+      heroSection,
+      ...fetchedSections.filter(
+        (section) => (section.slug || '').toString().toUpperCase() !== 'HERO' && section.slug !== heroSection.slug
+      ),
+    ]
     stats.value = Array.isArray(homePayload?.stats) ? homePayload.stats : []
-    totals.value = homePayload?.totals ?? { users: 0, posts: 0, messages: 0 }
+    totals.value = homePayload?.totals ?? { users: 0, posts: 0, rooms: 0 }
   } catch (error) {
     console.error(error)
     errorMessage.value = '메인 데이터를 불러오지 못했습니다.'
@@ -61,8 +70,8 @@ onMounted(loadData)
         </div>
         <div class="col">
           <div class="card border-0 h-100 text-center py-3">
-            <p class="text-white-50 mb-1">채팅 메시지</p>
-            <h2 class="text-light mb-0">{{ totals.messages }}</h2>
+            <p class="text-white-50 mb-1">오픈 채팅방</p>
+            <h2 class="text-light mb-0">{{ totals.rooms }}</h2>
           </div>
         </div>
         <div class="col">

@@ -13,13 +13,13 @@ RUN apt-get update -y && \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
+ARG CACHE_BUSTER=1
 COPY . .
 
 RUN mkdir -p /app/staticfiles /app/media
 
 EXPOSE 8000
 
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 CMD ["/app/docker-entrypoint.sh"]

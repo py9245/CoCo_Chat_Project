@@ -4,9 +4,10 @@ from rest_framework.views import APIView
 
 from accounts.models import UserProfile
 from boards.models import Post
-from chatrooms.models import ChatMessage
+from chatrooms.models import ChatRoom
 from pages.models import PageSection, SiteStat
 from pages.serializers import PageSectionSerializer, SiteStatSerializer
+from randomchat.utils import perform_randomchat_housekeeping
 
 
 def healthz(_request):
@@ -15,6 +16,7 @@ def healthz(_request):
 
 class HomePageView(APIView):
     def get(self, request):
+        perform_randomchat_housekeeping()
         sections = PageSection.objects.all()
         stats = SiteStat.objects.all()
         payload = {
@@ -23,7 +25,7 @@ class HomePageView(APIView):
             "totals": {
                 "users": UserProfile.objects.count(),
                 "posts": Post.objects.count(),
-                "messages": ChatMessage.objects.count(),
+                "rooms": ChatRoom.objects.count(),
             },
         }
         return Response(payload)

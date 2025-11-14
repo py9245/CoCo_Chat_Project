@@ -20,14 +20,20 @@ services:
     container_name: backend
     env_file:
       - ./.env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=config.settings
     expose:
       - "8000"
     volumes:
       - ./backend/staticfiles:/app/staticfiles
       - ./backend/media:/app/media
+      - ./backend/docker-entrypoint.sh:/app/docker-entrypoint.sh:ro
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   db:
@@ -50,3 +56,7 @@ services:
       retries: 20
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped

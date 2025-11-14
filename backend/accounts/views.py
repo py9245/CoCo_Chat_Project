@@ -15,17 +15,24 @@ from accounts.serializers import (
     ProfileUpdateSerializer,
     RegisterSerializer,
 )
+from common.throttles import AnonymousRequestThrottle
+
+
+def issue_token_for_user(user):
+    Token.objects.filter(user=user).delete()
+    return Token.objects.create(user=user)
 
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [AnonymousRequestThrottle]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         profile = UserProfile.objects.get(user=user)
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_token_for_user(user)
         return Response(
             {"token": token.key, "profile": ProfileSerializer(profile, context={"request": request}).data},
             status=status.HTTP_201_CREATED,
@@ -34,13 +41,14 @@ class RegisterView(APIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [AnonymousRequestThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
         profile = UserProfile.objects.get(user=user)
-        token, _ = Token.objects.get_or_create(user=user)
+        token = issue_token_for_user(user)
         return Response(
             {"token": token.key, "profile": ProfileSerializer(profile, context={"request": request}).data},
             status=status.HTTP_200_OK,
@@ -85,8 +93,7 @@ class PasswordChangeView(APIView):
         serializer.is_valid(raise_exception=True)
         request.user.set_password(serializer.validated_data["new_password"])
         request.user.save()
-        Token.objects.filter(user=request.user).delete()
-        token = Token.objects.create(user=request.user)
+        token = issue_token_for_user(request.user)
         return Response({"detail": "비밀번호가 변경되었습니다.", "token": token.key})
 
 

@@ -13,6 +13,8 @@ TIME_ZONE = os.getenv("DJANGO_TIME_ZONE", "Asia/Seoul")
 USE_TZ = True
 USE_S3 = os.getenv("USE_S3", "0").lower() in {"1", "true", "yes"}
 AWS_PRESIGNED_URL_EXPIRES = int(os.getenv("AWS_PRESIGNED_URL_EXPIRES", "3600"))
+AUTH_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "1800"))
+RANDOM_CHAT_IDLE_SECONDS = int(os.getenv("RANDOM_CHAT_IDLE_SECONDS", "600"))
 
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
 CSRF_TRUSTED_ORIGINS = [o for o in os.getenv("DJANGO_TRUSTED_ORIGINS", "").split(",") if o]
@@ -25,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",
@@ -69,6 +72,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"
+ASGI_APPLICATION = "config.asgi.application"
 
 
 DATABASES = {
@@ -119,15 +123,38 @@ CORS_ALLOWED_ORIGINS = [
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "common.authentication.ExpiringTokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
+    "DEFAULT_THROTTLE_RATES": {
+        "randomchat_second": os.getenv("RANDOM_CHAT_THROTTLE_SECOND", "5/second"),
+        "anon_actions": os.getenv("ANON_THROTTLE_RATE", "10/minute"),
+    },
 }
+
+ANON_BLOCK_SECONDS = int(os.getenv("ANON_BLOCK_SECONDS", "300"))
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+REDIS_URL = os.getenv("REDIS_URL")
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [REDIS_URL],
+            },
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 if USE_S3:
     AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION", os.getenv("AWS_S3_REGION_NAME"))

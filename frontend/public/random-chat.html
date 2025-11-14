@@ -212,6 +212,87 @@
         color: #6b7280;
         margin-top: 12px;
       }
+
+      .hi-sidebar {
+        position: fixed;
+        top: 50%;
+        right: 1.5rem;
+        transform: translateY(-50%);
+        width: 260px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+        border-radius: 20px;
+        border: 1px solid #dce4f2;
+        padding: 1.75rem 1.5rem;
+        z-index: 999;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        box-shadow: 0 25px 60px rgba(15, 23, 42, 0.15);
+      }
+
+      .hi-sidebar__badge {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+        color: #0ea5e9;
+        background: rgba(14, 165, 233, 0.12);
+        padding: 0.25rem 0.7rem;
+        border-radius: 999px;
+      }
+
+      .hi-sidebar__title {
+        margin: 0;
+        font-size: 1.3rem;
+        color: #0f172a;
+      }
+
+      .hi-sidebar__text {
+        margin: 0;
+        color: #4b5563;
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+
+      .hi-sidebar__cta {
+        align-self: flex-start;
+        border-radius: 999px;
+        padding-inline: 1.4rem;
+        text-decoration: none;
+        box-shadow: 0 10px 20px rgba(3, 199, 90, 0.25);
+      }
+
+      .hi-sidebar__toggle {
+        align-self: flex-start;
+        border-radius: 999px;
+        margin-bottom: 0.5rem;
+      }
+
+      .hi-sidebar--closed {
+        transform: translateY(-50%) translateX(120%);
+      }
+
+      .hi-sidebar--closed .hi-sidebar__content {
+        display: none;
+      }
+
+      @media (max-width: 992px) {
+        .hi-sidebar {
+          width: auto;
+          min-width: 220px;
+          bottom: 1.5rem;
+          top: auto;
+          right: 1rem;
+          transform: none;
+          padding: 1.1rem 1.25rem;
+        }
+
+        .hi-sidebar--closed {
+          transform: none;
+        }
+      }
     </style>
   </head>
   <body>
@@ -230,16 +311,8 @@
         <div id="state-alert"></div>
         <div class="status-grid">
           <div class="status-card">
-            <span>대기열 인원</span>
-            <strong id="queue-size">0명</strong>
-          </div>
-          <div class="status-card">
-            <span>진행 중인 채팅</span>
-            <strong id="active-sessions">0개</strong>
-          </div>
-          <div class="status-card">
-            <span>내 순서</span>
-            <strong id="queue-position">-</strong>
+            <span>전체 참여자</span>
+            <strong id="participant-total">0명</strong>
           </div>
           <div class="status-card">
             <span>현재 상태</span>
@@ -276,27 +349,13 @@
       </section>
     </div>
 
-    <script>
-      ;(() => {
-        const TOKEN_KEY = 'codex_auth_token'
-        const PHONE_PATTERN = /010-\d{4}-\d{4}/
-        const STATE_LIMIT = 60
-        const determineApiBase = () => {
-          if (window.API_BASE_URL) return window.API_BASE_URL
-          const host = (window.location.hostname || '').toLowerCase()
-          if (host.includes('github.io') || host.includes('githubusercontent.com')) {
-            return 'https://15-164-232-40.nip.io/api'
-          }
-          if (window.location.origin) {
-            return `${window.location.origin}/api`
-          }
-          return 'https://15-164-232-40.nip.io/api'
-        }
-        const API_BASE_URL = determineApiBase().replace(/\/$/, '')
+        <script>
+      const TOKEN_KEY = 'codex_auth_token'
+      const STATE_LIMIT = 60
+      const PHONE_PATTERN = /010-\d{4}-\d{4}/
 
-        const queueSizeEl = document.getElementById('queue-size')
-        const activeSessionsEl = document.getElementById('active-sessions')
-        const queuePositionEl = document.getElementById('queue-position')
+      ;(() => {
+        const participantTotalEl = document.getElementById('participant-total')
         const currentStatusEl = document.getElementById('current-status')
         const stateAlertEl = document.getElementById('state-alert')
         const chatAlertEl = document.getElementById('chat-alert')
@@ -306,16 +365,17 @@
         const messageInputEl = document.getElementById('message-input')
         const sendBtnEl = document.getElementById('send-btn')
         const messageFormEl = document.getElementById('message-form')
-
         const joinBtn = document.getElementById('join-btn')
         const leaveBtn = document.getElementById('leave-btn')
         const matchBtn = document.getElementById('match-btn')
         const refreshBtn = document.getElementById('refresh-btn')
 
         let token = null
-        let statePollTimer = null
-        let messagePollTimer = null
+        let socket = null
+        let reconnectTimer = null
+        let intentionalClose = false
         let currentSessionId = null
+        let partnerAlias = '상대방'
 
         const readToken = () => {
           try {
@@ -325,211 +385,205 @@
           }
         }
 
-        const authHeaders = () => {
-          const headers = { Accept: 'application/json' }
-          if (token) {
-            headers.Authorization = `Token ${token}`
-          }
-          return headers
-        }
-
-        const setAlert = (target, message, variant = 'danger') => {
+        const setAlert = (target, message, tone = 'danger') => {
           if (!target) return
           if (!message) {
             target.innerHTML = ''
             return
           }
           const className =
-            variant === 'success'
+            tone === 'success'
               ? 'alert alert-success'
-              : variant === 'warning'
+              : tone === 'warning'
                 ? 'alert alert-warning'
                 : 'alert alert-danger'
           target.innerHTML = `<div class="${className}">${message}</div>`
         }
 
-        const renderMessages = (messages = [], partnerAlias = '상대방') => {
+        const buildWsUrl = () => {
+          const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+          const base = `${protocol}://${window.location.host}`
+          return `${base}/ws/random-chat/?token=${encodeURIComponent(token)}`
+        }
+
+        const connectSocket = () => {
+          if (!token) {
+            setAlert(stateAlertEl, '로그인 후 이용할 수 있습니다.', 'warning')
+            return
+          }
+          if (socket && socket.readyState === WebSocket.OPEN) return
+          socket = new WebSocket(buildWsUrl())
+          socket.addEventListener('open', () => {
+            setAlert(stateAlertEl, '')
+            sendAction('fetch_state')
+          })
+          socket.addEventListener('message', handleSocketMessage)
+          socket.addEventListener('close', (event) => {
+            if (intentionalClose) {
+              intentionalClose = false
+              return
+            }
+            if (event.code === 4401) {
+              setAlert(stateAlertEl, '인증에 실패했습니다. 다시 로그인해 주세요.', 'danger')
+              return
+            }
+            setAlert(stateAlertEl, '실시간 연결이 종료되었습니다. 재연결을 시도합니다.', 'warning')
+            if (reconnectTimer) clearTimeout(reconnectTimer)
+            reconnectTimer = setTimeout(connectSocket, 3000)
+          })
+          socket.addEventListener('error', () => {
+            socket.close()
+          })
+        }
+
+        const disconnectSocket = () => {
+          if (socket) {
+            intentionalClose = true
+            socket.close()
+            socket = null
+          }
+        }
+
+        const sendAction = (action, payload = {}) => {
+          if (!socket || socket.readyState !== WebSocket.OPEN) {
+            connectSocket()
+            setAlert(stateAlertEl, '실시간 연결을 준비 중입니다. 잠시 후 다시 시도해 주세요.', 'warning')
+            return false
+          }
+          socket.send(JSON.stringify({ action, ...payload }))
+          return true
+        }
+
+        const handleSocketMessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            switch (data.event) {
+              case 'state':
+                updateUI(data.payload)
+                setAlert(chatAlertEl, '')
+                break
+              case 'messages':
+                renderMessages(data.messages, partnerAlias)
+                break
+              case 'message':
+                appendMessage(data.message, partnerAlias)
+                break
+              case 'info':
+                setAlert(stateAlertEl, data.detail, 'success')
+                break
+              case 'error':
+                setAlert(stateAlertEl, data.detail, 'danger')
+                break
+              default:
+                console.warn('Unhandled event', data)
+            }
+          } catch (error) {
+            console.error('메시지를 파싱할 수 없습니다.', error)
+          }
+        }
+
+        const formatTime = (value) =>
+          new Intl.DateTimeFormat('ko-KR', { timeStyle: 'short' }).format(new Date(value))
+
+        const shouldStickToBottom = () =>
+          Math.abs(messageStreamEl.scrollHeight - (messageStreamEl.scrollTop + messageStreamEl.clientHeight)) < 40
+
+        const renderMessages = (messages = [], alias = '상대방') => {
+          const stick = shouldStickToBottom()
           messageStreamEl.innerHTML = ''
           if (!messages.length) {
             placeholderEl.hidden = false
             return
           }
           placeholderEl.hidden = true
-          messages.forEach((msg) => {
-            const wrapper = document.createElement('article')
-            wrapper.className = 'message' + (msg.from_self ? ' me' : '')
-            const author = msg.from_self ? '나' : partnerAlias
-            const time = new Intl.DateTimeFormat('ko-KR', {
-              timeStyle: 'short',
-            }).format(new Date(msg.created_at))
-            wrapper.innerHTML = `<strong>${author}</strong><p>${msg.content}</p><small>${time}</small>`
-            messageStreamEl.appendChild(wrapper)
-          })
-          messageStreamEl.scrollTop = messageStreamEl.scrollHeight
+          messages.forEach((msg) => appendMessage(msg, alias, false))
+          if (stick) {
+            messageStreamEl.scrollTop = messageStreamEl.scrollHeight
+          }
+        }
+
+        const appendMessage = (message, alias = '상대방', autoScroll = true) => {
+          if (!message) return
+          const stick = autoScroll ? shouldStickToBottom() : false
+          const wrapper = document.createElement('article')
+          wrapper.className = 'message' + (message.from_self ? ' me' : '')
+          const author = message.from_self ? '나' : alias
+          wrapper.innerHTML = `<strong>${author}</strong><p>${message.content}</p><small>${formatTime(message.created_at)}</small>`
+          messageStreamEl.appendChild(wrapper)
+          if (stick || autoScroll) {
+            messageStreamEl.scrollTop = messageStreamEl.scrollHeight
+          }
         }
 
         const updateUI = (payload) => {
-          const previousSessionId = currentSessionId
           const {
             queue_size = 0,
             active_sessions = 0,
-            queue_position = null,
             in_queue = false,
             session = null,
+            messages = [],
           } = payload || {}
 
-          queueSizeEl.textContent = `${queue_size}명`
-          activeSessionsEl.textContent = `${active_sessions}개`
-          queuePositionEl.textContent = queue_position ? `${queue_position}번째` : '-'
+          const participantTotal = Math.max(queue_size + active_sessions * 2, 0)
+          participantTotalEl.textContent = `${participantTotal}명`
 
           if (session) {
-            currentStatusEl.textContent = `${session.partner_alias} 연결됨`
+            partnerAlias = session.partner_alias || '상대방'
+            currentStatusEl.textContent = `${partnerAlias}과 연결되었습니다.`
             messageInputEl.disabled = false
             sendBtnEl.disabled = false
-            const isNewSession = session.id !== previousSessionId
+            const isNewSession = session.id !== currentSessionId
             currentSessionId = session.id
             matchNoticeEl.hidden = !isNewSession
+            if (isNewSession) {
+              setAlert(chatAlertEl, `"${partnerAlias}"님과 매칭되었습니다.`, 'success')
+            }
           } else if (in_queue) {
             currentStatusEl.textContent = '대기열에서 상대를 기다리는 중'
             messageInputEl.disabled = true
             sendBtnEl.disabled = true
             matchNoticeEl.hidden = true
+            messageInputEl.value = ''
             currentSessionId = null
           } else {
             currentStatusEl.textContent = '대기열에 합류하지 않았습니다.'
             messageInputEl.disabled = true
             sendBtnEl.disabled = true
             matchNoticeEl.hidden = true
+            messageInputEl.value = ''
             currentSessionId = null
+            partnerAlias = '상대방'
           }
 
+          joinBtn.disabled = Boolean(in_queue)
           leaveBtn.disabled = !in_queue
           matchBtn.disabled = !in_queue
 
-          if (session && Array.isArray(payload.messages)) {
-            renderMessages(payload.messages, session.partner_alias)
-          } else {
-            renderMessages([])
+          if (session && messages.length) {
+            renderMessages(messages, partnerAlias)
+          } else if (!session) {
+            renderMessages([], partnerAlias)
           }
-          startMessagePolling()
         }
 
-        const buildApiUrl = (path) => {
-          const normalized = path.startsWith('/') ? path : `/${path}`
-          return `${API_BASE_URL}${normalized}`
-        }
-
-        const request = async (path, options = {}) => {
-          const response = await fetch(buildApiUrl(path), {
-            ...options,
-            headers: {
-              ...authHeaders(),
-              ...(options.headers || {}),
-            },
-          })
-          const text = await response.text()
-          let payload = null
-          if (text) {
-            try {
-              payload = JSON.parse(text)
-            } catch {
-              payload = null
-            }
-          }
-          if (!response.ok) {
-            const message =
-              payload?.detail ||
-              (response.status === 404
-                ? '랜덤 채팅 서버가 아직 업데이트되지 않았습니다. 잠시 후 다시 시도해 주세요.'
-                : `요청이 실패했습니다. (${response.status})`)
-            const error = new Error(message)
-            error.payload = payload
-            error.status = response.status
-            throw error
-          }
-          return payload
-        }
-
-        const refreshState = async () => {
+        joinBtn.addEventListener('click', () => {
           if (!token) {
-            setAlert(stateAlertEl, '로그인을 먼저 완료한 후 이용할 수 있습니다.', 'warning')
+            setAlert(stateAlertEl, '로그인 후 이용할 수 있습니다.', 'warning')
             return
           }
-          try {
-            const payload = await request(`/random-chat/state?limit=${STATE_LIMIT}`)
-            setAlert(stateAlertEl, '')
-            updateUI(payload)
-            startMessagePolling()
-          } catch (error) {
-            setAlert(stateAlertEl, error.message, error.status === 404 ? 'warning' : 'danger')
-          }
-        }
-
-        const refreshMessages = async () => {
-          if (!token || !currentSessionId) return
-          try {
-            const payload = await request(`/random-chat/messages?limit=${STATE_LIMIT}`)
-            renderMessages(payload?.messages, '상대방')
-          } catch (error) {
-            console.error(error)
-          }
-        }
-
-        const startPolling = () => {
-          if (statePollTimer) clearInterval(statePollTimer)
-          statePollTimer = setInterval(refreshState, 5000)
-        }
-
-        const startMessagePolling = () => {
-          if (messagePollTimer) clearInterval(messagePollTimer)
-          if (!currentSessionId) return
-          messagePollTimer = setInterval(refreshMessages, 2000)
-        }
-
-        joinBtn.addEventListener('click', async () => {
-          if (!token) {
-            setAlert(stateAlertEl, '로그인이 필요합니다.', 'warning')
-            return
-          }
-          joinBtn.disabled = true
-          try {
-            const payload = await request('/random-chat/queue', { method: 'POST' })
-            updateUI(payload)
-          } catch (error) {
-            setAlert(stateAlertEl, error.message)
-          } finally {
-            joinBtn.disabled = false
-            startPolling()
-          }
+          sendAction('join_queue')
         })
 
-        leaveBtn.addEventListener('click', async () => {
-          leaveBtn.disabled = true
-          try {
-            await request('/random-chat/queue', { method: 'DELETE' })
-            await refreshState()
-          } catch (error) {
-            setAlert(stateAlertEl, error.message)
-          } finally {
-            leaveBtn.disabled = false
-          }
+        leaveBtn.addEventListener('click', () => {
+          sendAction('leave_queue')
         })
 
-        matchBtn.addEventListener('click', async () => {
-          matchBtn.disabled = true
-          try {
-            const payload = await request('/random-chat/match', { method: 'POST' })
-            updateUI(payload)
-            startMessagePolling()
-          } catch (error) {
-            setAlert(stateAlertEl, error.message, error.status === 202 ? 'warning' : 'danger')
-          } finally {
-            matchBtn.disabled = false
-          }
+        matchBtn.addEventListener('click', () => {
+          sendAction('request_match')
         })
 
         refreshBtn.addEventListener('click', () => {
-          refreshState()
+          sendAction('fetch_state')
         })
 
         messageInputEl.addEventListener('keydown', (event) => {
@@ -539,7 +593,7 @@
           }
         })
 
-        messageFormEl.addEventListener('submit', async (event) => {
+        messageFormEl.addEventListener('submit', (event) => {
           event.preventDefault()
           if (!currentSessionId) {
             setAlert(chatAlertEl, '매칭이 완료된 후 메시지를 보낼 수 있습니다.', 'warning')
@@ -554,36 +608,83 @@
             setAlert(chatAlertEl, '전화번호 형식(010-0000-0000)은 전송할 수 없습니다.')
             return
           }
-          sendBtnEl.disabled = true
-          try {
-            await request('/random-chat/messages', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ content }),
-            })
+          if (sendAction('send_message', { content })) {
             messageInputEl.value = ''
-            setAlert(chatAlertEl, '', 'success')
-            await refreshMessages()
-          } catch (error) {
-            setAlert(chatAlertEl, error.message)
-          } finally {
-            sendBtnEl.disabled = false
+            setAlert(chatAlertEl, '')
           }
         })
 
         window.addEventListener('storage', (event) => {
-          if (event.key === TOKEN_KEY) {
-            readToken()
-            refreshState()
+          if (event.key !== TOKEN_KEY) return
+          const previousToken = token
+          readToken()
+          if (!token) {
+            disconnectSocket()
+            setAlert(stateAlertEl, '로그인 후 이용할 수 있습니다.', 'warning')
+            updateUI({ in_queue: false, messages: [] })
+            return
+          }
+          if (token !== previousToken) {
+            disconnectSocket()
+            connectSocket()
           }
         })
 
         readToken()
-        refreshState().then(() => {
-          startPolling()
-          startMessagePolling()
+        if (token) {
+          connectSocket()
+        } else {
+          setAlert(stateAlertEl, '로그인 후 이용할 수 있습니다.', 'warning')
+        }
+      })()
+
+      ;(() => {
+        const sidebar = document.querySelector('[data-sidebar]')
+        const toggleButton = document.querySelector('[data-sidebar-toggle]')
+        const content = sidebar?.querySelector('.hi-sidebar__content')
+        if (!sidebar || !toggleButton || !content) return
+
+        const MOBILE_WIDTH = 992
+
+      const applyState = () => {
+        const isMobile = window.innerWidth < MOBILE_WIDTH
+        toggleButton.hidden = !isMobile
+        if (!isMobile) {
+          sidebar.classList.remove('hi-sidebar--closed')
+          toggleButton.textContent = '닫기'
+          content.hidden = false
+          return
+          }
+          const isClosed = sidebar.classList.contains('hi-sidebar--closed')
+          content.hidden = isClosed
+          toggleButton.textContent = isClosed ? '"HI" 인사하기' : '닫기'
+        }
+
+        toggleButton.addEventListener('click', () => {
+          sidebar.classList.toggle('hi-sidebar--closed')
+          applyState()
         })
+
+        window.addEventListener('resize', applyState)
+        applyState()
       })()
     </script>
+
+  <aside class="hi-sidebar" data-sidebar>
+      <button class="hi-sidebar__toggle btn btn-outline-secondary btn-sm" type="button" data-sidebar-toggle>닫기</button>
+      <div class="hi-sidebar__content">
+        <div class="hi-sidebar__badge">제작자</div>
+        <h3 class="hi-sidebar__title">"HI" 인사하기</h3>
+        <p class="hi-sidebar__text">서비스 제작자(py9245)에게 궁금한 점이나 응원 메시지를 바로 남겨보세요.</p>
+        <a
+          class="hi-sidebar__cta btn btn-success btn-sm"
+          href="https://meeting.ssafy.com/s14public/messages/@py9245"
+          target="_blank"
+          rel="noopener"
+        >
+          메세지 보내기
+        </a>
+      </div>
+    </aside>
   </body>
 </html>

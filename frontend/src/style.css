@@ -65,15 +65,11 @@ body {
 
 .nav-stack .nav-link {
   font-weight: 600;
-  border-bottom: 2px solid transparent;
-  transition: color 0.2s ease, border-color 0.2s ease;
-  padding-bottom: 0.25rem;
   color: #111 !important;
 }
 
 .nav-stack .nav-link.active {
   color: var(--naver-green) !important;
-  border-color: var(--naver-green);
 }
 
 .panel {
@@ -182,12 +178,17 @@ body {
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-.navbar-collapse {
+.app-navbar-collapse {
+  display: none;
   background: #fff;
   border-radius: 16px;
   border: 1px solid #e5e7eb;
   padding: 1rem;
   margin-top: 1rem;
+}
+
+.app-navbar-collapse--open {
+  display: block;
 }
 
 .navbar-toggler {
@@ -217,9 +218,101 @@ body {
   color: var(--naver-green) !important;
 }
 
+@media (min-width: 992px) {
+  .app-navbar-collapse {
+    display: flex !important;
+    align-items: center;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin-top: 0;
+    gap: 2rem;
+  }
+}
+
 
 .random-chat-form .btn {
   align-self: flex-end;
+}
+
+.hi-sidebar {
+  position: fixed;
+  top: 50%;
+  right: 1.5rem;
+  transform: translateY(-50%);
+  width: 260px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-radius: 20px;
+  border: 1px solid #dce4f2;
+  padding: 1.75rem 1.5rem;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.15);
+}
+
+.hi-sidebar__badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.12);
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+}
+
+.hi-sidebar__title {
+  margin: 0;
+  font-size: 1.3rem;
+  color: #0f172a;
+}
+
+.hi-sidebar__text {
+  margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.hi-sidebar__cta {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding-inline: 1.5rem;
+  box-shadow: 0 10px 20px rgba(3, 199, 90, 0.25);
+}
+
+.hi-sidebar__toggle {
+  margin-bottom: 0.5rem;
+}
+
+.hi-sidebar--closed {
+  transform: translateY(-50%) translateX(120%);
+}
+
+.hi-sidebar--closed .hi-sidebar__content {
+  display: none;
+}
+
+@media (max-width: 992px) {
+  .hi-sidebar {
+    width: auto;
+    min-width: 220px;
+    bottom: 1.5rem;
+    top: auto;
+    right: 1.25rem;
+    transform: none;
+    padding: 1rem 1.25rem;
+  }
+
+  .hi-sidebar--closed {
+    transform: translateX(0) translateY(0);
+    bottom: 1.5rem;
+    right: 1.25rem;
+  }
 }
 
 .badge.bg-gradient {

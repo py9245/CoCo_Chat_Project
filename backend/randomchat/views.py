@@ -1,7 +1,6 @@
 import random
 
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
@@ -10,75 +9,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from randomchat.models import RandomChatMessage, RandomChatQueueEntry, RandomChatSession
-from randomchat.serializers import RandomChatMessageSerializer, RandomChatSessionSerializer
-
-RANDOM_CHAT_DEFAULT_LIMIT = 40
-RANDOM_CHAT_MAX_LIMIT = 80
-
-
-def get_active_random_session(user):
-    if not user or not user.is_authenticated:
-        return None
-    return (
-        RandomChatSession.objects.filter(is_active=True)
-        .filter(Q(participant_a=user) | Q(participant_b=user))
-        .order_by("-started_at")
-        .first()
-    )
-
-
-def end_random_sessions_for(user):
-    if not user or not user.is_authenticated:
-        return
-    RandomChatSession.objects.filter(is_active=True).filter(
-        Q(participant_a=user) | Q(participant_b=user)
-    ).update(is_active=False, ended_at=timezone.now())
-
-
-def build_random_chat_state(request, limit=RANDOM_CHAT_DEFAULT_LIMIT):
-    user = request.user
-    session = get_active_random_session(user)
-    messages_data = []
-    active_sessions = RandomChatSession.objects.filter(is_active=True).count()
-    if session:
-        queryset = (
-            RandomChatMessage.objects.filter(session=session)
-            .order_by("-created_at")[:limit]
-        )
-        messages = list(queryset)
-        messages.reverse()
-        messages_data = RandomChatMessageSerializer(
-            messages,
-            many=True,
-            context={"request": request},
-        ).data
-
-    queue_entry = RandomChatQueueEntry.objects.filter(user=user).first()
-    queue_size = RandomChatQueueEntry.objects.count()
-    queue_position = None
-    if queue_entry:
-        queue_position = (
-            RandomChatQueueEntry.objects.filter(joined_at__lt=queue_entry.joined_at).count() + 1
-        )
-
-    session_data = (
-        RandomChatSessionSerializer(session, context={"request": request}).data
-        if session
-        else None
-    )
-
-    return {
-        "in_queue": bool(queue_entry),
-        "queue_position": queue_position,
-        "queue_size": queue_size,
-        "active_sessions": active_sessions,
-        "session": session_data,
-        "messages": messages_data,
-    }
+from randomchat.serializers import RandomChatMessageSerializer
+from randomchat.throttles import RandomChatThrottle
+from randomchat.utils import (
+    RANDOM_CHAT_DEFAULT_LIMIT,
+    RANDOM_CHAT_MAX_LIMIT,
+    build_random_chat_state,
+    end_random_sessions_for,
+    get_active_random_session,
+    perform_randomchat_housekeeping,
+)
 
 
 class RandomChatStateView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [RandomChatThrottle]
 
     def _get_limit(self, request):
         try:
@@ -88,6 +33,7 @@ class RandomChatStateView(APIView):
         return max(1, min(limit, RANDOM_CHAT_MAX_LIMIT))
 
     def get(self, request):
+        perform_randomchat_housekeeping()
         limit = self._get_limit(request)
         payload = build_random_chat_state(request, limit)
         return Response(payload, status=status.HTTP_200_OK)
@@ -95,8 +41,10 @@ class RandomChatStateView(APIView):
 
 class RandomChatQueueView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [RandomChatThrottle]
 
     def post(self, request):
+        perform_randomchat_housekeeping()
         entry, created = RandomChatQueueEntry.objects.get_or_create(user=request.user)
         if not created:
             entry.joined_at = timezone.now()
@@ -105,31 +53,32 @@ class RandomChatQueueView(APIView):
         return Response(payload, status=status.HTTP_200_OK)
 
     def delete(self, request):
+        perform_randomchat_housekeeping()
         RandomChatQueueEntry.objects.filter(user=request.user).delete()
+        end_random_sessions_for(request.user)
         return Response({"detail": "랜덤 채팅 대기열에서 나갔습니다."}, status=status.HTTP_200_OK)
 
 
 class RandomChatMatchView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [RandomChatThrottle]
 
     def post(self, request):
+        perform_randomchat_housekeeping()
         with transaction.atomic():
             try:
                 own_entry = RandomChatQueueEntry.objects.select_for_update().get(user=request.user)
             except RandomChatQueueEntry.DoesNotExist:
                 own_entry = RandomChatQueueEntry.objects.create(user=request.user)
-            candidates = (
-                RandomChatQueueEntry.objects.select_for_update()
-                .exclude(user=request.user)
-                .order_by("joined_at")
+            candidates = list(
+                RandomChatQueueEntry.objects.select_for_update().exclude(user=request.user)
             )
-            count = candidates.count()
-            if count == 0:
+            if not candidates:
                 return Response(
                     {"detail": "대기 중인 다른 이용자가 없습니다. 잠시만 기다려 주세요."},
                     status=status.HTTP_202_ACCEPTED,
                 )
-            partner_entry = candidates[random.randrange(count)]
+            partner_entry = random.choice(candidates)
             partner_user = partner_entry.user
             partner_entry.delete()
             own_entry.delete()
@@ -143,6 +92,7 @@ class RandomChatMatchView(APIView):
 
 class RandomChatMessageView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [RandomChatThrottle]
 
     def _ensure_session(self, request):
         session = get_active_random_session(request.user)
@@ -151,6 +101,7 @@ class RandomChatMessageView(APIView):
         return session
 
     def get(self, request):
+        perform_randomchat_housekeeping()
         session = get_active_random_session(request.user)
         if not session:
             return Response({"messages": []}, status=status.HTTP_200_OK)
@@ -165,6 +116,7 @@ class RandomChatMessageView(APIView):
         return Response({"messages": serializer.data}, status=status.HTTP_200_OK)
 
     def post(self, request):
+        perform_randomchat_housekeeping()
         session = self._ensure_session(request)
         serializer = RandomChatMessageSerializer(
             data=request.data,
