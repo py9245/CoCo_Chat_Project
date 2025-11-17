@@ -1,11 +1,14 @@
+import logging
 import random
 from types import SimpleNamespace
+from urllib.parse import parse_qs
 
-from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.contrib.auth.models import AnonymousUser
 from django.db import transaction
 from django.utils import timezone
+from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import ValidationError
 
 from randomchat.models import RandomChatMessage, RandomChatQueueEntry, RandomChatSession
@@ -17,6 +20,8 @@ from randomchat.utils import (
     get_active_random_session,
     perform_randomchat_housekeeping,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _session_group_name(session_id):
@@ -33,22 +38,39 @@ class RandomChatConsumer(AsyncJsonWebsocketConsumer):
     REST API가 담당하던 대기열/매칭/메시지를 실시간으로 처리합니다.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.session_group = None
+        self.user_group_name = None
+
     async def connect(self):
-        self.user = getattr(self.scope, "user", None)
+        self.user = await database_sync_to_async(self._authenticate_from_scope)()
         if not self.user or not self.user.is_authenticated:
             await self.close(code=4401)
             return
 
+        await self.housekeep()
         self.user_group_name = _user_group_name(self.user.id)
-        self.session_group = None
-
         await self.channel_layer.group_add(self.user_group_name, self.channel_name)
         await self.accept()
-        await self.housekeep()
-        await self.send_state()
+
+    def _authenticate_from_scope(self):
+        query = self.scope.get("query_string", b"")
+        try:
+            params = parse_qs(query.decode())
+        except Exception:
+            return AnonymousUser()
+        token_key = params.get("token", [None])[0]
+        if not token_key:
+            return AnonymousUser()
+        try:
+            token = Token.objects.select_related("user").get(key=token_key)
+        except Token.DoesNotExist:
+            return AnonymousUser()
+        return token.user if token.user.is_active else AnonymousUser()
 
     async def disconnect(self, _code):
-        if hasattr(self, "user_group_name"):
+        if self.user_group_name:
             await self.channel_layer.group_discard(self.user_group_name, self.channel_name)
         if self.session_group:
             await self.channel_layer.group_discard(self.session_group, self.channel_name)
@@ -242,3 +264,4 @@ class RandomChatConsumer(AsyncJsonWebsocketConsumer):
             "created_at": message.created_at.isoformat(),
             "sender_id": message.sender_id,
         }
+logger = logging.getLogger(__name__)

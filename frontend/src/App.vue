@@ -84,7 +84,7 @@ const handleGlobalLogout = async () => {
     <header class="naver-nav shadow-sm">
       <nav class="navbar navbar-expand-lg navbar-light bg-white">
         <div class="container">
-          <RouterLink class="navbar-brand naver-logo" to="/">Codex Platform</RouterLink>
+          <RouterLink class="navbar-brand naver-logo" to="/">CoCo-Chat</RouterLink>
           <button
             v-if="shouldShowToggle"
             class="navbar-toggler"

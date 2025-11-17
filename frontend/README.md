@@ -1,8 +1,8 @@
-# Codex Vue Frontend
+# CoCo-Chat Vue Frontend
 
-Vue 3 + Vite SPA that reads messages from the Django REST API (`/api/messages`) and writes its
-production build straight into `../frontend_build`, which is already mounted by nginx in
-`docker-compose.yml`.
+Vue 3 + Vite SPA for the CoCo-Chat 서비스 that reads messages from the Django REST API (`/api/messages`)
+and writes its production build straight into `../frontend_build`, which is already mounted by nginx
+in `docker-compose.yml`.
 
 ## Getting started
 

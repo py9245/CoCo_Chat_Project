@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>랜덤 채팅 전용 화면</title>
+    <link rel="icon" type="image/png" href="/favicon.png" sizes="96x96" />
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon" />
     <style>
       :root {
         font-family: 'Pretendard', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -290,14 +292,14 @@
         }
 
         .hi-sidebar--closed {
-          transform: none;
+          transform: translateX(calc(100% + 1.5rem));
         }
       }
     </style>
   </head>
   <body>
     <div class="top-bar">
-      <a class="logo" href="/">Codex Platform</a>
+      <a class="logo" href="/">CoCo-Chat</a>
       <a class="home-link" href="/">홈으로 돌아가기</a>
     </div>
     <div class="container">
@@ -349,10 +351,45 @@
       </section>
     </div>
 
-        <script>
+    <aside class="hi-sidebar" data-sidebar>
+      <button class="hi-sidebar__toggle btn btn-outline-secondary btn-sm" type="button" data-sidebar-toggle hidden>
+        닫기
+      </button>
+      <div class="hi-sidebar__content">
+        <div class="hi-sidebar__badge">제작자</div>
+        <h3 class="hi-sidebar__title">"HI" 인사하기</h3>
+        <p class="hi-sidebar__text">서비스 제작자(py9245)에게 궁금한 점이나 응원 메시지를 바로 남겨보세요.</p>
+        <a
+          class="hi-sidebar__cta btn btn-success btn-sm"
+          href="https://meeting.ssafy.com/s14public/messages/@py9245"
+          target="_blank"
+          rel="noopener"
+        >
+          메세지 보내기
+        </a>
+      </div>
+    </aside>
+
+    <script>
       const TOKEN_KEY = 'codex_auth_token'
       const STATE_LIMIT = 60
       const PHONE_PATTERN = /010-\d{4}-\d{4}/
+
+      const determineBackendOrigin = () => {
+        if (window.API_BASE_URL) {
+          try {
+            return new URL(window.API_BASE_URL, window.location.origin).origin
+          } catch {
+            // fall through
+          }
+        }
+        const host = (window.location.hostname || '').toLowerCase()
+        if (host.includes('github.io') || host.includes('githubusercontent.com')) {
+          return 'https://15-164-232-40.nip.io'
+        }
+        return window.location.origin || 'https://15-164-232-40.nip.io'
+      }
+      const BACKEND_ORIGIN = determineBackendOrigin().replace(/\/$/, '')
 
       ;(() => {
         const participantTotalEl = document.getElementById('participant-total')
@@ -376,6 +413,9 @@
         let intentionalClose = false
         let currentSessionId = null
         let partnerAlias = '상대방'
+        const PLACEHOLDER_WAITING =
+          '아직 매칭되지 않았습니다. 대기열에 진입한 뒤 채팅하기를 눌러 상대방과 연결하세요.'
+        const PLACEHOLDER_CONNECTED = '상대방과 연결되었습니다. 첫 메시지를 보내보세요.'
 
         const readToken = () => {
           try {
@@ -401,9 +441,9 @@
         }
 
         const buildWsUrl = () => {
-          const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-          const base = `${protocol}://${window.location.host}`
-          return `${base}/ws/random-chat/?token=${encodeURIComponent(token)}`
+          const protocol = BACKEND_ORIGIN.startsWith('https') ? 'wss' : 'ws'
+          const host = BACKEND_ORIGIN.replace(/^https?:\/\//, '')
+          return `${protocol}://${host}/ws/random-chat/?token=${encodeURIComponent(token)}`
         }
 
         const connectSocket = () => {
@@ -462,9 +502,13 @@
                 updateUI(data.payload)
                 setAlert(chatAlertEl, '')
                 break
-              case 'messages':
-                renderMessages(data.messages, partnerAlias)
+              case 'messages': {
+                const placeholderMessage = currentSessionId
+                  ? PLACEHOLDER_CONNECTED
+                  : PLACEHOLDER_WAITING
+                renderMessages(data.messages, partnerAlias, placeholderMessage)
                 break
+              }
               case 'message':
                 appendMessage(data.message, partnerAlias)
                 break
@@ -488,14 +532,21 @@
         const shouldStickToBottom = () =>
           Math.abs(messageStreamEl.scrollHeight - (messageStreamEl.scrollTop + messageStreamEl.clientHeight)) < 40
 
-        const renderMessages = (messages = [], alias = '상대방') => {
+        const renderMessages = (messages = [], alias = '상대방', placeholderMessage = null) => {
           const stick = shouldStickToBottom()
           messageStreamEl.innerHTML = ''
           if (!messages.length) {
-            placeholderEl.hidden = false
+            if (placeholderEl) {
+              if (placeholderMessage) {
+                placeholderEl.textContent = placeholderMessage
+              }
+              placeholderEl.hidden = false
+            }
             return
           }
-          placeholderEl.hidden = true
+          if (placeholderEl) {
+            placeholderEl.hidden = true
+          }
           messages.forEach((msg) => appendMessage(msg, alias, false))
           if (stick) {
             messageStreamEl.scrollTop = messageStreamEl.scrollHeight
@@ -504,6 +555,9 @@
 
         const appendMessage = (message, alias = '상대방', autoScroll = true) => {
           if (!message) return
+          if (placeholderEl) {
+            placeholderEl.hidden = true
+          }
           const stick = autoScroll ? shouldStickToBottom() : false
           const wrapper = document.createElement('article')
           wrapper.className = 'message' + (message.from_self ? ' me' : '')
@@ -561,8 +615,10 @@
 
           if (session && messages.length) {
             renderMessages(messages, partnerAlias)
-          } else if (!session) {
-            renderMessages([], partnerAlias)
+          } else if (session) {
+            renderMessages([], partnerAlias, PLACEHOLDER_CONNECTED)
+          } else {
+            renderMessages([], partnerAlias, PLACEHOLDER_WAITING)
           }
         }
 
@@ -640,51 +696,43 @@
 
       ;(() => {
         const sidebar = document.querySelector('[data-sidebar]')
-        const toggleButton = document.querySelector('[data-sidebar-toggle]')
-        const content = sidebar?.querySelector('.hi-sidebar__content')
-        if (!sidebar || !toggleButton || !content) return
+        if (!sidebar) return
+        const toggleButton = sidebar.querySelector('[data-sidebar-toggle]')
+        const content = sidebar.querySelector('.hi-sidebar__content')
+        const mobileQuery = window.matchMedia('(max-width: 992px)')
+        let isOpen = true
 
-        const MOBILE_WIDTH = 992
-
-      const applyState = () => {
-        const isMobile = window.innerWidth < MOBILE_WIDTH
-        toggleButton.hidden = !isMobile
-        if (!isMobile) {
-          sidebar.classList.remove('hi-sidebar--closed')
-          toggleButton.textContent = '닫기'
-          content.hidden = false
-          return
+        const syncState = () => {
+          const isMobile = mobileQuery.matches
+          if (!isMobile) {
+            isOpen = true
           }
-          const isClosed = sidebar.classList.contains('hi-sidebar--closed')
-          content.hidden = isClosed
-          toggleButton.textContent = isClosed ? '"HI" 인사하기' : '닫기'
+          if (toggleButton) {
+            toggleButton.hidden = !isMobile
+            toggleButton.textContent = isOpen ? '닫기' : '"HI" 인사하기'
+          }
+          if (content) {
+            const shouldHideContent = isMobile && !isOpen
+            content.style.display = shouldHideContent ? 'none' : ''
+            content.setAttribute('aria-hidden', shouldHideContent ? 'true' : 'false')
+          }
+          sidebar.classList.toggle('hi-sidebar--closed', isMobile && !isOpen)
         }
 
-        toggleButton.addEventListener('click', () => {
-          sidebar.classList.toggle('hi-sidebar--closed')
-          applyState()
-        })
+        if (toggleButton) {
+          toggleButton.addEventListener('click', () => {
+            if (!mobileQuery.matches) {
+              return
+            }
+            isOpen = !isOpen
+            syncState()
+          })
+        }
 
-        window.addEventListener('resize', applyState)
-        applyState()
+        mobileQuery.addEventListener('change', syncState)
+        window.addEventListener('resize', syncState)
+        syncState()
       })()
     </script>
-
-  <aside class="hi-sidebar" data-sidebar>
-      <button class="hi-sidebar__toggle btn btn-outline-secondary btn-sm" type="button" data-sidebar-toggle>닫기</button>
-      <div class="hi-sidebar__content">
-        <div class="hi-sidebar__badge">제작자</div>
-        <h3 class="hi-sidebar__title">"HI" 인사하기</h3>
-        <p class="hi-sidebar__text">서비스 제작자(py9245)에게 궁금한 점이나 응원 메시지를 바로 남겨보세요.</p>
-        <a
-          class="hi-sidebar__cta btn btn-success btn-sm"
-          href="https://meeting.ssafy.com/s14public/messages/@py9245"
-          target="_blank"
-          rel="noopener"
-        >
-          메세지 보내기
-        </a>
-      </div>
-    </aside>
   </body>
 </html>

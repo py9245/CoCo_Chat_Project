@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { fetchHealth, fetchHomeOverview } from '@/services/api'
 
 const health = ref({ ok: null, text: 'API 상태 확인 중...' })
@@ -8,6 +8,37 @@ const stats = ref([])
 const totals = ref({ users: 0, posts: 0, rooms: 0 })
 const isLoading = ref(true)
 const errorMessage = ref('')
+const projectTabs = [
+  {
+    id: 'erd',
+    title: 'ERD & 데이터 모델',
+    description:
+      'PostgreSQL 기반 정규화 모델을 사용해 대화, 계정, 알림 데이터를 분리했습니다. ERD 다이어그램으로 관계형 구조를 한눈에 파악하고 변경 이력을 기록합니다.',
+    features: ['PostgreSQL 보안 정책 + 역할 기반 접근 제어', 'ERD 기준 FK 제약 및 데이터 무결성 확보', '백업 및 PITR 스냅샷으로 장애 시점 복구'],
+    route: { path: '/docs/erd' },
+    cta: 'ERD 다이어그램 보기',
+  },
+  {
+    id: 'architecture',
+    title: '아키텍처 & 인프라',
+    description:
+      'WebSocket 기반 실시간 채팅과 Django REST API를 분리 배포했습니다. GitHub Pages 정적 빌드로 프런트 공격면을 줄이고, AWS WAF + nginx rate-limit으로 디도스 및 악의적인 트래픽을 방어합니다.',
+    features: ['WebSocket 소켓 구현 + 재연결 로직', 'DDoS 방어용 rate-limit & 오토 블록', '정적 빌드/Edge Cache로 민감 정보 노출 차단'],
+    route: { path: '/docs/architecture' },
+    cta: '아키텍처 흐름 보기',
+  },
+  {
+    id: 'roadmap',
+    title: '프로젝트 발전 과정',
+    description:
+      '프로토타입 → MFA 로그인 → 소켓 클러스터링 → 악성 메시지 필터링까지 단계별 발전 과정을 타임라인으로 정리했습니다. 추후에는 자동화 방어룰과 지능형 분석을 추가할 예정입니다.',
+    features: ['v1: REST 게시판 + 기본 채팅', 'v2: 소켓 스케일아웃 & DDoS 관제', 'v3: GitHub Actions 보안 스캔 + PostgreSQL 암호화'],
+    route: { path: '/docs/roadmap' },
+    cta: '발전 과정 살펴보기',
+  },
+]
+const activeProjectTab = ref(projectTabs[0].id)
+const activeTabContent = computed(() => projectTabs.find((tab) => tab.id === activeProjectTab.value) || projectTabs[0])
 
 const loadData = async () => {
   isLoading.value = true
@@ -44,6 +75,10 @@ const loadData = async () => {
 }
 
 onMounted(loadData)
+
+const setActiveProjectTab = (id) => {
+  activeProjectTab.value = id
+}
 </script>
 
 <template>
@@ -54,7 +89,7 @@ onMounted(loadData)
           <span class="badge" :class="health.ok ? 'bg-success' : 'bg-danger'"></span>
           <span>{{ health.text }}</span>
         </div>
-        <h1 class="display-5 fw-semibold text-light mb-3">Codex Platform</h1>
+        <h1 class="display-5 fw-semibold text-light mb-3">CoCo-Chat</h1>
         <p class="text-white-50 mb-4">게시판 · 계정 · 채팅을 한 곳에서 관리하고, 익명 랜덤 채팅은 전용 화면에서 즐겨보세요.</p>
         <div class="d-flex flex-wrap gap-3">
           <a class="btn btn-primary btn-lg shadow nav-hover" href="/random-chat.html">랜덤 채팅 열기</a>
@@ -80,6 +115,46 @@ onMounted(loadData)
             <h2 class="text-light mb-0">{{ totals.users }}</h2>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel mb-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+      <div>
+        <h2 class="h4 text-light mb-2">프로젝트 인사이트 허브</h2>
+        <p class="text-white-50 mb-0">
+          ERD, 시스템 아키텍처, 발전 과정을 탭으로 살펴보며 소켓 구현, 디도스 방어, 악의적인 트래픽 차단, GitHub Pages 정적 빌드,
+          PostgreSQL 보안 전략을 확인하세요.
+        </p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <button
+          v-for="tab in projectTabs"
+          :key="tab.id"
+          type="button"
+          :class="[
+            'btn',
+            'nav-hover',
+            activeProjectTab === tab.id ? 'btn-info text-white' : 'btn-outline-info text-light',
+          ]"
+          @click="setActiveProjectTab(tab.id)"
+        >
+          {{ tab.title }}
+        </button>
+      </div>
+    </div>
+    <div class="card border-0 fade-card">
+      <div class="card-body">
+        <span class="badge bg-secondary text-uppercase w-auto">{{ activeTabContent.id }}</span>
+        <h3 class="h5 text-light mt-3 mb-2">{{ activeTabContent.title }}</h3>
+        <p class="text-white-50 mb-3">{{ activeTabContent.description }}</p>
+        <ul class="text-white-50 small ps-3 mb-4">
+          <li v-for="feature in activeTabContent.features" :key="feature">{{ feature }}</li>
+        </ul>
+        <router-link v-if="activeTabContent.route" class="btn btn-outline-light nav-hover" :to="activeTabContent.route">
+          {{ activeTabContent.cta || '자세히 보기' }}
+        </router-link>
       </div>
     </div>
   </section>
