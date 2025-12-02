@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { createChatRoom, fetchChatRooms, joinChatRoom, leaveChatRoom, loadAuthToken } from '@/services/api'
+import { createChatRoom, fetchChatRooms, getApiBaseUrl, joinChatRoom, leaveChatRoom, loadAuthToken } from '@/services/api'
 import { useSession } from '@/composables/useSession'
 import GlobalChatPanel from '@/components/GlobalChatPanel.vue'
 
@@ -32,6 +32,30 @@ let shouldReconnect = false
 const ws = ref(null)
 const canUseAnonymous = computed(() => !isAdmin.value)
 const activeTab = ref('global')
+const realtimeLabel = computed(() => {
+  switch (realtimeState.status) {
+    case 'open':
+      return '실시간 연결됨'
+    case 'connecting':
+      return '연결 준비 중'
+    case 'closed':
+      return '재연결 대기'
+    default:
+      return '대기 중'
+  }
+})
+const connectionToneClass = computed(() => {
+  if (realtimeState.status === 'open') return 'pill-success'
+  if (realtimeState.status === 'connecting') return 'pill-warning'
+  if (realtimeState.status === 'closed') return 'pill-danger'
+  return 'pill-muted'
+})
+const currentRoomSummary = computed(() => {
+  if (!currentRoom.value) {
+    return '입장 후 메시지를 보낼 수 있습니다.'
+  }
+  return `정원 ${currentRoom.value.member_count}/${currentRoom.value.capacity} · ${currentRoom.value.is_private ? '비공개' : '공개'}`
+})
 
 const formatDate = (value) => {
   if (!value) return ''
@@ -65,12 +89,7 @@ const setCurrentRoom = (room) => {
 
 const resolveWsOrigin = () => {
   if (typeof window === 'undefined') return null
-  const host = (window.location.hostname || '').toLowerCase()
-  const isGithubHost = host.includes('github.io') || host.includes('githubusercontent.com')
-  let runtimeBase = window.API_BASE_URL || import.meta.env.VITE_API_BASE_URL || '/api'
-  if (isGithubHost) {
-    runtimeBase = window.API_BASE_URL || 'https://15-164-232-40.nip.io/api'
-  }
+  const runtimeBase = getApiBaseUrl()
   try {
     const absolute = new URL(runtimeBase, window.location.origin)
     const protocol = absolute.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -369,11 +388,49 @@ onUnmounted(() => {
   <section class="panel">
     <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3 mb-4">
       <div>
-        <h2 class="h4 text-light mb-1">공개 채팅 라운지</h2>
-        <p class="text-white-50 mb-0">실시간 자유 채팅과 채팅방 관리를 한 화면에서 이어서 이용할 수 있습니다.</p>
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="pill pill-muted">오픈 채팅</span>
+          <span class="pill" :class="connectionToneClass">{{ realtimeLabel }}</span>
+        </div>
+        <h2 class="h4 text-light mb-1">누구나 참여하는 오픈 라운지</h2>
+        <p class="text-white-50 mb-0">
+          원하는 방을 선택해 바로 대화하거나, 새 방을 만들어 초대 코드를 공유하세요.
+        </p>
       </div>
-      <router-link class="btn btn-outline-light nav-hover" to="/chat">화면 새로고침</router-link>
+      <div class="d-flex flex-wrap gap-2">
+        <router-link class="btn btn-outline-light nav-hover" to="/">메인으로</router-link>
+        <button class="btn btn-outline-info nav-hover" type="button" @click="loadRooms">목록 새로고침</button>
+      </div>
     </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-lg-4">
+        <div class="soft-card h-100">
+          <p class="text-white-50 small mb-1">내 상태</p>
+          <h6 class="mb-1 text-light">{{ profile ? profile.user.username : '로그인 필요' }}</h6>
+          <p class="text-white-50 mb-0">
+            {{ profile ? (canUseAnonymous ? '익명/닉네임 선택 가능' : '관리자 · 실명 발송') : '로그인 후 참여 가능' }}
+          </p>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="soft-card h-100">
+          <p class="text-white-50 small mb-1">실시간 연결</p>
+          <div class="d-flex align-items-center gap-2">
+            <span class="pill" :class="connectionToneClass">{{ realtimeLabel }}</span>
+            <small class="text-white-50">{{ realtimeState.error || '끊기면 자동으로 다시 연결합니다.' }}</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-4">
+        <div class="soft-card h-100">
+          <p class="text-white-50 small mb-1">현재 방</p>
+          <strong class="d-block mb-1 text-light">{{ currentRoom ? currentRoom.name : '아직 선택되지 않음' }}</strong>
+          <small class="text-white-50">{{ currentRoomSummary }}</small>
+        </div>
+      </div>
+    </div>
+
     <div class="nav nav-pills gap-2 mb-4 flex-wrap">
       <button
         class="btn nav-hover"
@@ -395,203 +452,216 @@ onUnmounted(() => {
     <div v-if="activeTab === 'global'">
       <GlobalChatPanel />
     </div>
-    <div v-else class="row g-4">
-      <div class="col-12 col-lg-4">
-        <div class="card border-0 mb-4">
-          <div class="card-body">
-            <h5 class="text-light mb-3">공개 채팅방</h5>
-            <p class="text-white-50 small mb-3">목록에는 누구나 입장 가능한 공개형 채팅방만 표시됩니다.</p>
-            <div v-if="roomsLoading" class="alert alert-info">채팅방 목록을 불러오는 중...</div>
-            <div v-else-if="roomsError" class="alert alert-danger">{{ roomsError }}</div>
-            <ul v-else class="list-group list-group-flush">
-              <li v-if="!rooms.length" class="list-group-item bg-transparent text-white-50">
-                아직 공개 채팅방이 없습니다.
-              </li>
-              <li
-                v-for="room in rooms"
-                :key="room.id"
-                class="list-group-item d-flex justify-content-between align-items-center bg-transparent text-light"
-              >
-                <div>
-                  <p class="mb-0 fw-semibold">{{ room.name }}</p>
-                  <small class="text-white-50">
-                    {{ room.member_count }}/{{ room.capacity }} · {{ room.owner_username || '운영자' }}
-                  </small>
-                </div>
-                <button
-                  class="btn btn-sm nav-hover"
-                  :class="room.is_member ? 'btn-secondary' : 'btn-outline-light'"
-                  :disabled="
-                    joiningRoomId === room.id ||
-                    room.member_count >= room.capacity ||
-                    (room.is_member && currentRoom && currentRoom.id === room.id)
-                  "
-                  type="button"
-                  @click="handleSelectRoom(room)"
-                >
-                  <span v-if="joiningRoomId === room.id">입장 중...</span>
-                  <span v-else-if="room.is_member && currentRoom && currentRoom.id === room.id">이용 중</span>
-                  <span v-else-if="room.is_member">입장 완료</span>
-                  <span v-else-if="room.member_count >= room.capacity">정원 초과</span>
-                  <span v-else>입장</span>
-                </button>
-              </li>
-            </ul>
-            <button class="btn btn-outline-info nav-hover mt-3 w-100" type="button" @click="loadRooms">새로 고침</button>
-          </div>
-        </div>
-
-        <div class="card border-0 mb-4">
-          <div class="card-body">
-            <h5 class="text-light mb-3">채팅방 생성</h5>
-            <form class="row g-3" autocomplete="off" @submit.prevent="handleCreateRoom">
-              <div class="col-12">
-                <label class="form-label text-white-50">채팅방 이름</label>
-                <input v-model="createRoomForm.name" class="form-control" maxlength="50" required />
-              </div>
-              <div class="col-12">
-                <label class="form-label text-white-50">정원 (2~200명)</label>
-                <input
-                  v-model.number="createRoomForm.capacity"
-                  class="form-control"
-                  min="2"
-                  max="200"
-                  type="number"
-                  required
-                />
-              </div>
-              <div class="col-12 form-check form-switch">
-                <input id="createPrivate" v-model="createRoomForm.is_private" class="form-check-input" type="checkbox" />
-                <label class="form-check-label text-white-50" for="createPrivate">비공개 채팅방</label>
-              </div>
-              <div v-if="createRoomForm.is_private" class="col-12">
-                <label class="form-label text-white-50">비밀번호</label>
-                <input v-model="createRoomForm.password" class="form-control" type="password" minlength="4" required />
-                <small class="text-white-50">비공개 채팅방은 목록에 표시되지 않으며 비밀번호로만 입장합니다.</small>
-              </div>
-              <div class="col-12">
-                <button class="btn btn-primary nav-hover w-100" :disabled="createRoomLoading" type="submit">
-                  <span v-if="createRoomLoading">생성 중...</span>
-                  <span v-else>채팅방 생성</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <div class="card border-0">
-          <div class="card-body">
-            <h5 class="text-light mb-3">비공개 채팅방 입장</h5>
-            <form class="row g-3" autocomplete="off" @submit.prevent="handleJoinPrivateRoom">
-              <div class="col-12">
-                <label class="form-label text-white-50">채팅방 이름</label>
-                <input v-model="privateJoinForm.name" class="form-control" placeholder="예) 프로젝트 A" required />
-              </div>
-              <div class="col-12">
-                <label class="form-label text-white-50">비밀번호</label>
-                <input v-model="privateJoinForm.password" class="form-control" type="password" required />
-              </div>
-              <div class="col-12">
-                <button class="btn btn-outline-light nav-hover w-100" :disabled="privateJoinLoading" type="submit">
-                  <span v-if="privateJoinLoading">입장 중...</span>
-                  <span v-else>입장하기</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+    <div v-else>
+      <div class="alert alert-info mb-4">
+        원하는 분위기의 방이 없다면 직접 만들고 링크를 공유하세요. 비공개 방은 목록에 표시되지 않고 비밀번호로만 입장합니다.
       </div>
 
-      <div class="col-12 col-lg-8">
-        <div class="card border-0 h-100">
-          <div class="card-body d-flex flex-column gap-3 h-100">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <h5 class="text-light mb-1">{{ currentRoom ? currentRoom.name : '채팅방을 선택해 주세요' }}</h5>
-                <p class="text-white-50 mb-0">
-                  {{
-                    currentRoom
-                      ? `정원 ${currentRoom.member_count}/${currentRoom.capacity} · ${
-                          currentRoom.is_private ? '비공개' : '공개'
-                        }`
-                      : '좌측에서 채팅방을 선택하거나 새로 만들 수 있습니다.'
-                  }}
-                </p>
-                <p v-if="currentRoom" class="text-white-50 small mb-0">
-                  {{
-                    realtimeState.status === 'open'
-                      ? '실시간 연결됨'
-                      : realtimeState.status === 'connecting'
-                        ? '실시간 연결 중...'
-                        : '실시간 연결이 끊어져 재시도 중입니다.'
-                  }}
-                </p>
+      <div class="row g-4">
+        <div class="col-12 col-lg-4">
+          <div class="card border-0 mb-4">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="text-light mb-0">공개 채팅방</h5>
+                <button class="btn btn-sm btn-outline-info nav-hover" type="button" @click="loadRooms">새로고침</button>
               </div>
-              <div class="d-flex gap-2">
-                <router-link class="btn btn-outline-light btn-sm nav-hover" to="/boards">게시판 보기</router-link>
-                <button
-                  v-if="currentRoom"
-                  class="btn btn-outline-danger btn-sm nav-hover"
-                  :disabled="leavingRoom"
-                  type="button"
-                  @click="handleLeaveRoom"
+              <p class="text-white-50 small mb-3">목록에는 누구나 입장 가능한 공개형 채팅방만 표시됩니다.</p>
+              <div v-if="roomsLoading" class="alert alert-info">채팅방 목록을 불러오는 중...</div>
+              <div v-else-if="roomsError" class="alert alert-danger">{{ roomsError }}</div>
+              <div v-else class="d-flex flex-column gap-2 room-list">
+                <div v-if="!rooms.length" class="panel-placeholder">아직 공개 채팅방이 없습니다.</div>
+                <article
+                  v-for="room in rooms"
+                  :key="room.id"
+                  class="room-tile d-flex justify-content-between align-items-center"
                 >
-                  <span v-if="leavingRoom">나가는 중...</span>
-                  <span v-else>채팅방 나가기</span>
-                </button>
+                  <div>
+                    <p class="mb-0 fw-semibold text-light">{{ room.name }}</p>
+                    <small class="text-white-50">
+                      {{ room.member_count }}/{{ room.capacity }} · {{ room.owner_username || '운영자' }}
+                    </small>
+                  </div>
+                  <button
+                    class="btn btn-sm nav-hover"
+                    :class="room.is_member ? 'btn-secondary' : 'btn-outline-light'"
+                    :disabled="
+                      joiningRoomId === room.id ||
+                      room.member_count >= room.capacity ||
+                      (room.is_member && currentRoom && currentRoom.id === room.id)
+                    "
+                    type="button"
+                    @click="handleSelectRoom(room)"
+                  >
+                    <span v-if="joiningRoomId === room.id">입장 중...</span>
+                    <span v-else-if="room.is_member && currentRoom && currentRoom.id === room.id">이용 중</span>
+                    <span v-else-if="room.is_member">입장 완료</span>
+                    <span v-else-if="room.member_count >= room.capacity">정원 초과</span>
+                    <span v-else>입장</span>
+                  </button>
+                </article>
               </div>
             </div>
+          </div>
 
-            <div v-if="isLoadingMessages" class="alert alert-info">채팅 메시지를 불러오는 중...</div>
-            <div v-else-if="currentRoom && !chatMessages.length" class="alert alert-secondary">
-              아직 대화가 없습니다. 첫 메시지를 남겨보세요!
-            </div>
-            <div v-else-if="currentRoom" class="chat-messages list-group list-group-flush">
-              <article v-for="chat in chatMessages" :key="chat.id" class="chat-message list-group-item">
-                <div class="d-flex justify-content-between">
-                  <span class="fw-semibold" :class="{ 'text-warning': chat.is_anonymous }">{{ chat.display_name }}</span>
-                  <small>{{ formatDate(chat.created_at) }}</small>
+          <div class="card border-0 mb-4">
+            <div class="card-body">
+              <h5 class="text-light mb-3">채팅방 생성</h5>
+              <form class="row g-3" autocomplete="off" @submit.prevent="handleCreateRoom">
+                <div class="col-12">
+                  <label class="form-label text-white-50">채팅방 이름</label>
+                  <input v-model="createRoomForm.name" class="form-control" maxlength="50" placeholder="예) 주말 영화 추천방" required />
                 </div>
-                <p class="mt-1">{{ chat.content }}</p>
-              </article>
+                <div class="col-12">
+                  <label class="form-label text-white-50">정원 (2~200명)</label>
+                  <input
+                    v-model.number="createRoomForm.capacity"
+                    class="form-control"
+                    min="2"
+                    max="200"
+                    type="number"
+                    required
+                  />
+                </div>
+                <div class="col-12 form-check form-switch">
+                  <input id="createPrivate" v-model="createRoomForm.is_private" class="form-check-input" type="checkbox" />
+                  <label class="form-check-label text-white-50" for="createPrivate">비공개 채팅방</label>
+                </div>
+                <div v-if="createRoomForm.is_private" class="col-12">
+                  <label class="form-label text-white-50">비밀번호</label>
+                  <input v-model="createRoomForm.password" class="form-control" type="password" minlength="4" required />
+                  <small class="text-white-50">목록에 표시되지 않으며 비밀번호로만 입장합니다.</small>
+                </div>
+                <div class="col-12">
+                  <button class="btn btn-primary nav-hover w-100" :disabled="createRoomLoading" type="submit">
+                    <span v-if="createRoomLoading">생성 중...</span>
+                    <span v-else>채팅방 생성</span>
+                  </button>
+                </div>
+              </form>
             </div>
-            <div v-else class="alert alert-warning">채팅방을 선택하거나 새로 만들어주세요.</div>
+          </div>
 
-            <div v-if="chatError" class="alert alert-danger">{{ chatError }}</div>
-            <div v-else-if="realtimeState.error" class="alert alert-warning">{{ realtimeState.error }}</div>
+          <div class="card border-0">
+            <div class="card-body">
+              <h5 class="text-light mb-3">비공개 채팅방 입장</h5>
+              <form class="row g-3" autocomplete="off" @submit.prevent="handleJoinPrivateRoom">
+                <div class="col-12">
+                  <label class="form-label text-white-50">채팅방 이름</label>
+                  <input v-model="privateJoinForm.name" class="form-control" placeholder="예) 프로젝트 A" required />
+                </div>
+                <div class="col-12">
+                  <label class="form-label text-white-50">비밀번호</label>
+                  <input v-model="privateJoinForm.password" class="form-control" type="password" required />
+                </div>
+                <div class="col-12">
+                  <button class="btn btn-outline-light nav-hover w-100" :disabled="privateJoinLoading" type="submit">
+                    <span v-if="privateJoinLoading">입장 중...</span>
+                    <span v-else>입장하기</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
 
-            <form
-              v-if="profile && currentRoom"
-              class="chat-form mt-auto"
-              autocomplete="off"
-              @submit.prevent="handleSubmit"
-            >
-              <div v-if="!isAdmin" class="form-check form-switch mb-3">
-                <input id="chatAnon" v-model="chatForm.is_anonymous" class="form-check-input" type="checkbox" />
-                <label class="form-check-label text-white-50" for="chatAnon">
-                  {{ chatForm.is_anonymous ? '익명으로 보내기' : '아이디 공개' }}
-                </label>
+        <div class="col-12 col-lg-8">
+          <div class="card border-0 h-100 chat-frame">
+            <div class="card-body d-flex flex-column gap-3 h-100">
+              <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                <div>
+                  <h5 class="text-light mb-1">{{ currentRoom ? currentRoom.name : '채팅방을 선택해 주세요' }}</h5>
+                  <p class="text-white-50 mb-0">
+                    {{ currentRoom ? currentRoomSummary : '좌측에서 채팅방을 선택하거나 새로 만들 수 있습니다.' }}
+                  </p>
+                  <p v-if="currentRoom" class="text-white-50 small mb-0">
+                    {{ realtimeLabel }} · 끊기면 자동으로 재연결합니다.
+                  </p>
+                </div>
+                <div class="d-flex gap-2">
+                  <router-link class="btn btn-outline-light btn-sm nav-hover" to="/boards">게시판 보기</router-link>
+                  <button
+                    v-if="currentRoom"
+                    class="btn btn-outline-danger btn-sm nav-hover"
+                    :disabled="leavingRoom"
+                    type="button"
+                    @click="handleLeaveRoom"
+                  >
+                    <span v-if="leavingRoom">나가는 중...</span>
+                    <span v-else>채팅방 나가기</span>
+                  </button>
+                </div>
               </div>
-              <p v-else class="text-white-50 small">관리자는 실명(아이디)으로만 메시지를 보낼 수 있습니다.</p>
-              <textarea
-                v-model="chatForm.content"
-                class="form-control"
-                name="chat-content"
-                placeholder="지금 떠오르는 생각을 적어보세요 (최대 500자)"
-                maxlength="500"
-                @keydown="handleEditorKeydown"
-              ></textarea>
-              <button class="btn btn-primary nav-hover mt-3" :disabled="isSending || !canSend" type="submit">
-                <span v-if="isSending">전송 중...</span>
-                <span v-else>메시지 전송</span>
-              </button>
-            </form>
 
-            <div v-else-if="profile" class="alert alert-info mt-auto">
-              채팅방에 입장해야 메시지를 보낼 수 있습니다.
-            </div>
-            <div v-else class="alert alert-warning mt-auto">
-              로그인한 사용자만 채팅에 참여할 수 있습니다. 계정 페이지에서 로그인해 주세요.
+              <div v-if="isLoadingMessages" class="alert alert-info">채팅 메시지를 불러오는 중...</div>
+              <div v-else-if="currentRoom && !chatMessages.length" class="alert alert-secondary">
+                아직 대화가 없습니다. 첫 메시지를 남겨보세요!
+              </div>
+              <div v-else-if="currentRoom" class="chat-messages list-group list-group-flush">
+                <article 
+                  v-for="chat in chatMessages" 
+                  :key="chat.id" 
+                  class="chat-message list-group-item border-0 bg-transparent px-0"
+                  :class="{ 'text-end': profile && chat.username === profile.user.username }"
+                >
+                  <div class="d-inline-block text-start" style="max-width: 80%;">
+                    <div class="d-flex align-items-end gap-2 mb-1" :class="{ 'justify-content-end': profile && chat.username === profile.user.username }">
+                      <small v-if="profile && chat.username === profile.user.username" class="text-muted">{{ formatDate(chat.created_at) }}</small>
+                      <span class="fw-semibold badge bg-light text-dark border" v-if="!(profile && chat.username === profile.user.username)" :class="{ 'text-warning': chat.is_anonymous }">
+                        {{ chat.display_name }}
+                      </span>
+                      <small v-if="!(profile && chat.username === profile.user.username)" class="text-muted">{{ formatDate(chat.created_at) }}</small>
+                    </div>
+                    <div 
+                      class="p-3 rounded-3 shadow-sm"
+                      :class="[
+                        profile && chat.username === profile.user.username 
+                          ? 'bg-primary text-white fw-bold rounded-top-right-0' 
+                          : 'bg-white border fw-normal rounded-top-left-0'
+                      ]"
+                    >
+                      {{ chat.content }}
+                    </div>
+                  </div>
+                </article>
+              </div>
+              <div v-else class="alert alert-warning">채팅방을 선택하거나 새로 만들어주세요.</div>
+
+              <div v-if="chatError" class="alert alert-danger">{{ chatError }}</div>
+              <div v-else-if="realtimeState.error" class="alert alert-warning">{{ realtimeState.error }}</div>
+
+              <form
+                v-if="profile && currentRoom"
+                class="chat-form mt-auto"
+                autocomplete="off"
+                @submit.prevent="handleSubmit"
+              >
+                <div v-if="!isAdmin" class="form-check form-switch mb-3">
+                  <input id="chatAnon" v-model="chatForm.is_anonymous" class="form-check-input" type="checkbox" />
+                  <label class="form-check-label text-white-50" for="chatAnon">
+                    {{ chatForm.is_anonymous ? '익명으로 보내기' : '아이디 공개' }}
+                  </label>
+                </div>
+                <p v-else class="text-white-50 small">관리자는 실명(아이디)으로만 메시지를 보낼 수 있습니다.</p>
+                <textarea
+                  v-model="chatForm.content"
+                  class="form-control"
+                  name="chat-content"
+                  placeholder="지금 떠오르는 생각을 적어보세요 (최대 500자)"
+                  maxlength="500"
+                  @keydown="handleEditorKeydown"
+                ></textarea>
+                <button class="btn btn-primary nav-hover mt-3" :disabled="isSending || !canSend" type="submit">
+                  <span v-if="isSending">전송 중...</span>
+                  <span v-else>메시지 전송</span>
+                </button>
+              </form>
+
+              <div v-else-if="profile" class="alert alert-info mt-auto">
+                채팅방에 입장해야 메시지를 보낼 수 있습니다.
+              </div>
+              <div v-else class="alert alert-warning mt-auto">
+                로그인한 사용자만 채팅에 참여할 수 있습니다. 계정 페이지에서 로그인해 주세요.
+              </div>
             </div>
           </div>
         </div>

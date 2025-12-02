@@ -15,6 +15,7 @@ npm run dev
 - The dev server proxies any `/api/*` request to `http://localhost:8000` by default. Override the
   target with `VITE_API_PROXY_TARGET=http://127.0.0.1:9000 npm run dev` if you need another host.
 - Set `VITE_API_BASE_URL` to change the API base URL in production builds (default: `/api`).
+  - GitHub Pages 등 정적 배포 시에는 `public/api-config.js`의 `window.API_BASE_URL`도 새 백엔드 주소로 채워두면 런타임에 동일하게 적용됩니다.
 
 ## Build for nginx
 

@@ -93,7 +93,7 @@ const setActiveProjectTab = (id) => {
         <p class="text-white-50 mb-4">게시판 · 계정 · 채팅을 한 곳에서 관리하고, 익명 랜덤 채팅은 전용 화면에서 즐겨보세요.</p>
         <div class="d-flex flex-wrap gap-3">
           <a class="btn btn-primary btn-lg shadow nav-hover" href="/random-chat.html">랜덤 채팅 열기</a>
-          <router-link class="btn btn-outline-light btn-lg nav-hover" to="/chat">공개 채팅방 보기</router-link>
+          <router-link class="btn btn-outline-primary btn-lg nav-hover" to="/chat">공개 채팅방 보기</router-link>
         </div>
       </div>
       <div class="mini-stats row row-cols-1 g-3">
@@ -176,11 +176,11 @@ const setActiveProjectTab = (id) => {
         <div class="card h-100 border-0 fade-card">
           <div class="card-body d-flex flex-column gap-2">
             <span class="badge bg-secondary text-uppercase w-auto">{{ section.slug }}</span>
-            <h5 class="card-title text-light mb-0">{{ section.title }}</h5>
-            <p class="card-text text-white-50 flex-grow-1">{{ section.description }}</p>
+            <h5 class="card-title text-dark mb-0">{{ section.title }}</h5>
+            <p class="card-text text-muted flex-grow-1">{{ section.description }}</p>
             <router-link
               v-if="section.cta_link"
-              class="btn btn-sm btn-outline-light align-self-start nav-hover"
+              class="btn btn-sm btn-outline-primary align-self-start nav-hover"
               :to="section.cta_link"
             >
               {{ section.cta_label || '바로가기' }}
@@ -193,19 +193,19 @@ const setActiveProjectTab = (id) => {
 
   <section class="panel">
     <div class="mb-3">
-      <h2 class="h4 text-light mb-1">운영 수치</h2>
-      <p class="text-white-50 mb-0">DB, 백엔드, 프런트엔드가 공유하는 제약 조건입니다.</p>
+      <h2 class="h4 text-dark mb-1">운영 수치</h2>
+      <p class="text-muted mb-0">DB, 백엔드, 프런트엔드가 공유하는 제약 조건입니다.</p>
     </div>
 
     <div v-if="stats.length" class="row g-3">
       <div v-for="stat in stats" :key="stat.id" class="col-12 col-md-6 col-xl-4">
         <div class="card border-0 h-100 mini-stat-card">
           <div class="card-body">
-            <p class="text-white-50 mb-1">{{ stat.name }}</p>
-            <h3 class="text-light mb-2">
-              {{ stat.value }} <small class="text-white-50">{{ stat.unit }}</small>
+            <p class="text-muted mb-1">{{ stat.name }}</p>
+            <h3 class="text-dark mb-2">
+              {{ stat.value }} <small class="text-muted">{{ stat.unit }}</small>
             </h3>
-            <p class="mb-0 text-white-50">{{ stat.description }}</p>
+            <p class="mb-0 text-muted">{{ stat.description }}</p>
           </div>
         </div>
       </div>

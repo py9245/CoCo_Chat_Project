@@ -9,7 +9,6 @@
     <style>
       :root {
         font-family: 'Pretendard', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        background: #f5f6f8;
         color: #0f172a;
       }
 
@@ -20,7 +19,9 @@
       body {
         margin: 0;
         min-height: 100vh;
-        background: #f5f6f8;
+        background: radial-gradient(circle at 10% 20%, rgba(3, 199, 90, 0.08) 0, transparent 35%),
+          radial-gradient(circle at 90% 10%, rgba(14, 165, 233, 0.12) 0, transparent 35%),
+          linear-gradient(180deg, #f7faff 0%, #f6fff7 100%);
       }
 
       .top-bar {
@@ -28,15 +29,20 @@
         justify-content: space-between;
         align-items: center;
         padding: 16px 20px;
-        background: #fff;
+        background: rgba(255, 255, 255, 0.9);
         border-bottom: 1px solid #e5e7eb;
+        backdrop-filter: blur(10px);
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
 
       .logo {
-        font-weight: 700;
+        font-weight: 800;
         font-size: 1.1rem;
         color: #03c75a;
         text-decoration: none;
+        letter-spacing: -0.01em;
       }
 
       .home-link {
@@ -46,10 +52,12 @@
         border: 1px solid #d1d5db;
         padding: 6px 12px;
         border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
       }
 
       .container {
-        max-width: 960px;
+        max-width: 1040px;
         margin: 0 auto;
         padding: 32px 20px 48px;
       }
@@ -60,7 +68,8 @@
 
       h1 {
         margin: 0 0 12px;
-        font-size: clamp(1.8rem, 3vw, 2.4rem);
+        font-size: clamp(1.9rem, 3vw, 2.5rem);
+        letter-spacing: -0.02em;
       }
 
       p {
@@ -75,6 +84,105 @@
         padding: 24px;
         box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
         margin-bottom: 20px;
+      }
+
+      .hero {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 8px 0 4px;
+      }
+
+      .hero__eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        background: rgba(3, 199, 90, 0.12);
+        color: #0b8a48;
+        font-weight: 700;
+        font-size: 0.9rem;
+        width: fit-content;
+      }
+
+      .hero__title {
+        margin: 0;
+        font-size: clamp(2rem, 3vw, 2.5rem);
+        letter-spacing: -0.02em;
+      }
+
+      .hero__actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid #e5e7eb;
+        background: #fff;
+        color: #0f172a;
+        font-weight: 600;
+        gap: 6px;
+      }
+
+      .panel-title {
+        margin: 0 0 6px;
+        font-size: 1.1rem;
+      }
+
+      .panel-sub {
+        margin: 0;
+        color: #475569;
+      }
+
+      .intro-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+      }
+
+      .intro-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      }
+
+      .step-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .step-list li {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        padding: 12px;
+      }
+
+      .step-index {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(3, 199, 90, 0.15);
+        color: #0b8a48;
+        font-weight: 700;
       }
 
       .status-grid {
@@ -106,8 +214,12 @@
       .controls {
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 10px;
         margin-top: 20px;
+        padding: 10px;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        background: #f8fafc;
       }
 
       button {
@@ -167,6 +279,10 @@
         flex-direction: column;
         gap: 12px;
         margin-top: 12px;
+        padding: 8px;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        background: #ffffff;
       }
 
       .message {
@@ -174,6 +290,15 @@
         border-radius: 16px;
         padding: 12px 14px;
         background: #fff;
+      }
+
+      .message strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .message small {
+        color: #6b7280;
       }
 
       .message.me {
@@ -298,18 +423,78 @@
     </style>
   </head>
   <body>
+    <script src="/api-config.js"></script>
     <div class="top-bar">
       <a class="logo" href="/">CoCo-Chat</a>
       <a class="home-link" href="/">홈으로 돌아가기</a>
     </div>
     <div class="container">
-      <header>
-        <h1>랜덤 채팅 전용 화면</h1>
-        <p>대기열 합류, 매칭, 메시지 전송까지 이 화면에서 모두 제어할 수 있습니다.</p>
+      <header class="hero">
+        <div class="hero__eyebrow">1:1 랜덤 매칭</div>
+        <h1 class="hero__title">버튼 한 번으로 새로운 사람과 대화하세요</h1>
+        <p>대기열 합류 → 매칭 → 대화까지 한 화면에서 이어집니다. 대화 내용을 남기지 않고 바로 즐겨보세요.</p>
+        <div class="hero__actions">
+          <span class="chip">대기열 자동 매칭</span>
+          <span class="chip">전화번호 패턴 자동 차단</span>
+          <span class="chip">모바일 최적화</span>
+        </div>
       </header>
 
+      <section class="panel intro-panel">
+        <h2 class="panel-title">어떻게 이용하나요?</h2>
+        <p class="panel-sub">3단계만 거치면 바로 대화할 수 있습니다.</p>
+        <div class="intro-grid">
+          <div class="intro-card">
+            <ul class="step-list">
+              <li>
+                <span class="step-index">1</span>
+                <div>
+                  <strong>대기열 진입</strong>
+                  <p>“대기열 진입” 버튼을 눌러 매칭을 준비합니다.</p>
+                </div>
+              </li>
+              <li>
+                <span class="step-index">2</span>
+                <div>
+                  <strong>채팅하기</strong>
+                  <p>“채팅하기” 버튼으로 바로 상대와 연결됩니다.</p>
+                </div>
+              </li>
+              <li>
+                <span class="step-index">3</span>
+                <div>
+                  <strong>대화 주고받기</strong>
+                  <p>연락처 형식(010-0000-0000)은 자동으로 막혀 안전합니다.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+          <div class="intro-card">
+            <h3 class="panel-title">안심 기능</h3>
+            <p class="panel-sub">신고 없이도 안전하게 즐길 수 있도록 기본 보호 장치를 넣었습니다.</p>
+            <ul class="step-list">
+              <li>
+                <span class="step-index">OK</span>
+                <div>
+                  <strong>자동 재연결</strong>
+                  <p>연결이 끊겨도 다시 시도하니 대화를 이어가기 쉽습니다.</p>
+                </div>
+              </li>
+              <li>
+                <span class="step-index">OK</span>
+                <div>
+                  <strong>매칭 현황 표시</strong>
+                  <p>현재 상태와 참여 인원을 실시간으로 확인합니다.</p>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" id="state-panel">
-        <h2>실시간 현황</h2>
+        <h2 class="panel-title">실시간 현황</h2>
+        <p class="panel-sub">대기열, 매칭 상태, 메시지 전송을 이곳에서 모두 제어하세요.</p>
         <div id="state-alert"></div>
         <div class="status-grid">
           <div class="status-card">
@@ -327,10 +512,12 @@
           <button class="btn-secondary" id="match-btn" disabled>채팅하기</button>
           <button class="btn-secondary" id="refresh-btn">상태 새로고침</button>
         </div>
+        <p class="panel-sub" style="margin-top: 10px">대기열에 들어간 뒤 “채팅하기”를 누르면 바로 매칭됩니다.</p>
       </section>
 
       <section class="panel" id="chat-panel">
-        <h2>대화 영역</h2>
+        <h2 class="panel-title">대화 영역</h2>
+        <p class="panel-sub">매칭된 상대와 주고받은 메시지는 여기에서 확인합니다.</p>
         <div id="chat-alert"></div>
         <div id="match-notice" class="alert alert-success" hidden>상대방과 연결되었습니다.</div>
         <div class="stream" id="message-stream"></div>
@@ -376,18 +563,26 @@
       const PHONE_PATTERN = /010-\d{4}-\d{4}/
 
       const determineBackendOrigin = () => {
-        if (window.API_BASE_URL) {
+        const storedBase = (() => {
           try {
-            return new URL(window.API_BASE_URL, window.location.origin).origin
+            return localStorage.getItem('API_BASE_URL') || null
+          } catch {
+            return null
+          }
+        })()
+        const runtimeBase = window.API_BASE_URL || storedBase || null
+        if (runtimeBase) {
+          try {
+            return new URL(runtimeBase, window.location.origin).origin
           } catch {
             // fall through
           }
         }
         const host = (window.location.hostname || '').toLowerCase()
         if (host.includes('github.io') || host.includes('githubusercontent.com')) {
-          return 'https://15-164-232-40.nip.io'
+          return 'https://3-37-130-181.nip.io'
         }
-        return window.location.origin || 'https://15-164-232-40.nip.io'
+        return window.location.origin || 'https://3-37-130-181.nip.io'
       }
       const BACKEND_ORIGIN = determineBackendOrigin().replace(/\/$/, '')
 

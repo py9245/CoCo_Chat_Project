@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { fetchChatRooms, joinChatRoom, loadAuthToken } from '@/services/api'
+import { fetchChatRooms, getApiBaseUrl, joinChatRoom, loadAuthToken } from '@/services/api'
 import { useSession } from '@/composables/useSession'
 
 const DEFAULT_ROOM_NAME = '오픈 라운지'
@@ -61,12 +61,7 @@ const resolveWsOrigin = () => {
   if (typeof window === 'undefined') {
     return null
   }
-  const host = (window.location.hostname || '').toLowerCase()
-  const isGithubHost = host.includes('github.io') || host.includes('githubusercontent.com')
-  let runtimeBase = window.API_BASE_URL || import.meta.env.VITE_API_BASE_URL || '/api'
-  if (isGithubHost) {
-    runtimeBase = window.API_BASE_URL || 'https://15-164-232-40.nip.io/api'
-  }
+  const runtimeBase = getApiBaseUrl()
   try {
     const absolute = new URL(runtimeBase, window.location.origin)
     const protocol = absolute.protocol === 'https:' ? 'wss:' : 'ws:'

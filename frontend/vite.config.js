@@ -34,8 +34,8 @@ export default defineConfig(() => {
     },
     build: {
       outDir: '../frontend_build',
-      // 기존 배포 폴더에 권한이 없는 산출물이 있어도 빌드를 진행할 수 있도록 비우지 않습니다.
-      emptyOutDir: false,
+      // 빌드 시 기존 파일을 깨끗이 지웁니다.
+      emptyOutDir: true,
     },
   }
 })

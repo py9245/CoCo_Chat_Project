@@ -1,8 +1,16 @@
 const resolveRuntimeBase = () => {
   if (typeof window === 'undefined') return null
+  const stored = (() => {
+    try {
+      return window.localStorage?.getItem('API_BASE_URL') || null
+    } catch {
+      return null
+    }
+  })()
+  if (stored) return stored
   if (window.API_BASE_URL) return window.API_BASE_URL
-  if (window.location.hostname?.endsWith('github.io')) {
-    return 'https://15-164-232-40.nip.io/api'
+  if (window.location.hostname?.includes('github.io') || window.location.hostname?.includes('githubusercontent.com')) {
+    return 'https://3-37-130-181.nip.io/api'
   }
   if (window.location.origin) {
     return `${window.location.origin}/api`
@@ -18,6 +26,7 @@ const buildBaseUrl = () => {
 }
 
 const API_BASE_URL = buildBaseUrl()
+export const getApiBaseUrl = () => API_BASE_URL
 
 const buildUrl = (path) => {
   const cleaned = path.startsWith('/') ? path : `/${path}`
